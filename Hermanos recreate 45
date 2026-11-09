@@ -1,0 +1,2908 @@
+--!nocheck
+--[[
+    ========================================================================================
+    HERMANOS'DEV | PVP - FULL MASTER SCRIPT (v0.9 - FREE)
+    Game: [⚔️] Blox Fruit | Boblox-Script.com (Sea 1, Sea 2, Sea 3 - v30.1.2+)[cite: 1, 4]
+    Architecture:
+      1. 1:1 Translucent Dark-Acrylic UI Framework & Spiderweb Watermark Overlay[cite: 7]
+      2. Tarmac/Fluent Verified Lucide Icon Sprite Registry (No Missing '[]' Glyphs)[cite: 8, 9]
+      3. Mobile Draggable HUD ('Camera Lock', 'TP To Target', Top-Right '</>' Toggle)
+      4. Dynamic Yellow FOV Ring ('Middle', 'Mouse', 'Target' Modes)[cite: 10]
+      5. Blox Fruits Remotes ('CommF_', 'CommE', 'RE/RegisterAttack', 'RE/RegisterHit')
+      6. 360° Velocity-Predicted Silent Aim ('__namecall' MousePos Hook)[cite: 2]
+      7. Soru & Geppo Garbage-Collector ('getgc') Cooldown Bypass & Silent Teleport
+      8. 8-Field Real-Time Billboard ESP & 3D Target Sphere / Red Line Adornments[cite: 2]
+      9. Automated Bounty Hunting Engine with Portal Entrance Bypass & Sky Retreat
+    ========================================================================================
+]]
+
+repeat task.wait() until game:IsLoaded()
+repeat task.wait() until game:GetService("Players").LocalPlayer
+
+-- ========================================================================================
+-- [SECTION 1] SERVICES, EXECUTOR POLYFILLS & CONFIGURATION STORAGE
+-- ========================================================================================
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+local Lighting = game:GetService("Lighting")
+local StarterGui = game:GetService("StarterGui")
+local CollectionService = game:GetService("CollectionService")
+
+local VirtualInputManager = nil
+pcall(function()
+    VirtualInputManager = game:GetService("VirtualInputManager")
+end)
+
+local VirtualUser = nil
+pcall(function()
+    VirtualUser = game:GetService("VirtualUser")
+end)
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+local Mouse = LocalPlayer:GetMouse()
+
+-- Executor API compatibility polyfills[cite: 5]
+local getgenv = getgenv or function() return _G end
+local gethui = gethui or function()
+    local ok, core = pcall(function() return game:GetService("CoreGui") end)
+    if ok and core then return core end
+    return LocalPlayer:WaitForChild("PlayerGui")
+end
+local setclipboard = setclipboard or toclipboard or function(text)
+    print("[Hermanos'Dev Clipboard]: " .. tostring(text))
+end
+local getgc = getgc or get_gc_objects or function() return {} end
+local hookmetamethod = hookmetamethod or nil
+local getnamecallmethod = getnamecallmethod or function() return "" end
+local newcclosure = newcclosure or function(fn) return fn end
+local checkcaller = checkcaller or function() return false end
+local writefile = writefile or nil
+local readfile = readfile or nil
+local isfile = isfile or function() return false end
+local makefolder = makefolder or nil
+local isfolder = isfolder or function() return false end
+
+-- Remove prior GUI and 3D visual instances on re-execution
+local ParentGui = gethui()
+for _, child in ipairs(ParentGui:GetChildren()) do
+    if child.Name == "HermanosDev_PVP_Hub" or child.Name == "HermanosDev_Visuals" then
+        child:Destroy()
+    end
+end
+
+local VisualsFolder = Instance.new("Folder")
+VisualsFolder.Name = "HermanosDev_Visuals"
+VisualsFolder.Parent = ParentGui
+
+-- ========================================================================================
+-- [SECTION 2] VERIFIED LUCIDE ICON REGISTRY & TRANSLUCENT THEME PALETTE
+-- ========================================================================================
+-- Pre-uploaded 256x256 alpha-bled Lucide icons from the Fluent/Tarmac registry[cite: 8, 9]
+local LucideIcons = {
+    Flame           = "rbxassetid://10723376114", -- '0.9 - FREE' Red Pill Badge[cite: 8]
+    Link            = "rbxassetid://10723426722", -- 'discord' White Pill Button[cite: 8]
+    Minus           = "rbxassetid://10734896206", -- Header Minimize Button[cite: 8]
+    Maximize        = "rbxassetid://10734886735", -- Header Maximize Button[cite: 8]
+    Close           = "rbxassetid://10747384394", -- Header Close (X) Button[cite: 8]
+    Search          = "rbxassetid://10734943674", -- Sidebar Search Input Icon[cite: 8]
+
+    ChevronUp       = "rbxassetid://10709791523", -- Category Accordion Expanded[cite: 8]
+    ChevronDown     = "rbxassetid://10709790948", -- Category Accordion Collapsed[cite: 8]
+    ChevronsUpDown  = "rbxassetid://10709797508", -- Dropdown Selector Arrows[cite: 8]
+    Check           = "rbxassetid://10709790644", -- Blue Checkbox Checkmark[cite: 8]
+
+    General         = "rbxassetid://10709751939", -- Legit -> General (lucide-accessibility)[cite: 8]
+    Combat          = "rbxassetid://10734975692", -- Legit -> Combat (lucide-swords)[cite: 8]
+    ESP             = "rbxassetid://10723346959", -- Legit -> ESP (lucide-eye)[cite: 8]
+    BountyHunting   = "rbxassetid://10734962068", -- Rage -> Bounty Hunting (lucide-skull)[cite: 8]
+    Skills          = "rbxassetid://10709810948", -- Rage -> Skills (lucide-cog)
+    KeyBind         = "rbxassetid://10723416765", -- Rage -> Key Bind (lucide-keyboard)[cite: 8]
+    Misc            = "rbxassetid://10709811445", -- Rage -> Misc (lucide-compass)[cite: 8]
+
+    Haki            = "rbxassetid://10723404472", -- 'Auto Haki:' Section (lucide-grab)[cite: 8]
+    Ability         = "rbxassetid://10734951847", -- 'Ability:' Section (lucide-shield)[cite: 8]
+    Soru            = "rbxassetid://10723404472", -- 'Soru:' Section (lucide-grab)[cite: 8]
+    AttackAura      = "rbxassetid://10723405649", -- 'Attack Aura:' Section (lucide-hand)[cite: 8]
+    Utility         = "rbxassetid://10747383470", -- 'Utility:' Section (lucide-wrench)[cite: 8]
+    Visualize       = "rbxassetid://10709782845", -- 'Visualize:' Section (lucide-bug)[cite: 8]
+    Target          = "rbxassetid://10734977012", -- Target Indicator (lucide-target)[cite: 8]
+    Sword           = "rbxassetid://10734975486", -- Weapon Icon (lucide-sword)[cite: 8]
+    Bell            = "rbxassetid://10709775704", -- Notification Icon (lucide-bell)[cite: 8]
+    Refresh         = "rbxassetid://10734933266", -- Refresh Icon (lucide-refresh-cw)[cite: 8]
+    SpiderWeb       = "rbxassetid://15269177520"  -- Center Translucent Watermark Graphic
+}
+
+local Theme = {
+    WindowBg        = Color3.fromRGB(20, 21, 25),
+    WindowTrans     = 0.16,
+    SidebarBg       = Color3.fromRGB(18, 19, 23),
+    SidebarTrans    = 0.25,
+    HeaderBg        = Color3.fromRGB(22, 23, 28),
+    HeaderTrans     = 0.12,
+
+    CardBg          = Color3.fromRGB(36, 38, 45),
+    CardHoverBg     = Color3.fromRGB(44, 47, 56),
+    CardTrans       = 0.35,
+    TabActiveBg     = Color3.fromRGB(46, 49, 58),
+    TabActiveTrans  = 0.15,
+
+    CheckboxOn      = Color3.fromRGB(59, 130, 246),
+    CheckboxOff     = Color3.fromRGB(75, 79, 92),
+    SliderFill      = Color3.fromRGB(59, 130, 246),
+    SliderTrack     = Color3.fromRGB(26, 28, 34),
+    SliderThumb     = Color3.fromRGB(255, 255, 255),
+
+    FreeBadgeRed    = Color3.fromRGB(198, 28, 35),
+    DiscordPillBg   = Color3.fromRGB(246, 247, 250),
+    DiscordText     = Color3.fromRGB(20, 22, 26),
+
+    TextPrimary     = Color3.fromRGB(245, 246, 250),
+    TextSecondary   = Color3.fromRGB(152, 157, 170),
+    TextMuted       = Color3.fromRGB(108, 114, 128),
+
+    HudButtonBg     = Color3.fromRGB(24, 25, 30),
+    HudButtonTrans  = 0.12,
+    HudRedText      = Color3.fromRGB(235, 52, 52),
+    FovYellow       = Color3.fromRGB(222, 232, 58),
+    VisualRed       = Color3.fromRGB(235, 40, 40),
+    SuccessGreen    = Color3.fromRGB(74, 222, 128)
+}
+
+-- ========================================================================================
+-- [SECTION 3] MASTER CONFIGURATION & RUNTIME STATE REGISTRY
+-- ========================================================================================
+getgenv().script_mode = getgenv().script_mode or "PVP" -- Supports 'PVP' or 'FARM'[cite: 1, 5]
+
+getgenv().HermanosConfig = {
+    -- Window & Mobile HUD State
+    UI_Visible              = true,
+    UI_Maximized            = false,
+    ShowTargetHUD           = true,
+    CameraLock              = false,
+    TPToTarget              = false,
+
+    -- [LEGIT -> GENERAL]
+    BusoHaki                = true,
+    KenHaki                 = true,
+    RaceV3                  = false,
+    RaceV4                  = true,
+    AntiStun                = true,
+    SpeedMultiply           = 15,
+    SpeedBoost              = true,
+    JumpPower               = false,
+    JumpPowerValue          = 110,
+    WalkOnWater             = true,
+
+    -- [LEGIT -> COMBAT]
+    SilentAim               = true,
+    AimPart                 = "HumanoidRootPart",
+    PredictionFactor        = 0.135,
+    FOVSize                 = 483,
+    FOVMode                 = "Middle",
+    ShowFOV                 = true,
+    AimRange                = 500,
+    SoruSilentRange         = 250,
+    SoruSilent              = false,
+    AttackAura              = false,
+    FastAttackDelay         = 0.07,
+    TeleportBehideRange     = 250,
+    TeleportBehideTarget    = false,
+    TeleportOffsetZ         = 4.5,
+    TeleportOffsetY         = 0.0,
+    AutoSkills              = false,
+    DrawRedLine             = true,
+    DrawSphere              = true,
+
+    -- [LEGIT -> ESP]
+    ESP_Name                = false,
+    ESP_Health              = false,
+    ESP_Distance            = false,
+    ESP_Team                = false,
+    ESP_Level               = false,
+    ESP_Bounty              = false,
+    ESP_KenActive           = false,
+    ESP_PvpState            = false,
+    ESP_Tracers             = false,
+
+    -- [RAGE -> BOUNTY HUNTING]
+    AutoBounty              = false,
+    SafeHealth              = 4500,
+    RecoverHealth           = 6500,
+    MaxHuntTime             = 95,
+    BypassTP                = true,
+    TweenSpeed              = 325,
+    SkipRaceV4              = true,
+    SkipFruitUsers          = false,
+    SkipFriends             = true,
+    AutoServerHop           = false,
+    MinTargetLevel          = 1500,
+
+    -- [RAGE -> SKILLS]
+    UseMelee                = true,
+    Melee_Z                 = true,
+    Melee_X                 = true,
+    Melee_C                 = true,
+    MeleeHoldZ              = 1.5,
+    MeleeHoldX              = 0.1,
+    MeleeHoldC              = 0.1,
+
+    UseSword                = true,
+    Sword_Z                 = true,
+    Sword_X                 = true,
+    SwordHoldZ              = 0.1,
+    SwordHoldX              = 0.1,
+
+    UseFruit                = false,
+    Fruit_Z                 = true,
+    Fruit_X                 = true,
+    Fruit_C                 = true,
+    Fruit_V                 = false,
+    Fruit_F                 = false,
+    FruitHoldZ              = 1.5,
+    FruitHoldX              = 0.1,
+    FruitHoldC              = 0.1,
+    FruitHoldV              = 0.1,
+    FruitHoldF              = 0.1,
+
+    UseGun                  = false,
+    Gun_Z                   = true,
+    Gun_X                   = true,
+    GunHoldZ                = 0.1,
+    GunHoldX                = 0.1,
+
+    -- [RAGE -> KEY BIND]
+    Key_ToggleUI            = Enum.KeyCode.RightControl,
+    Key_CameraLock          = Enum.KeyCode.Q,
+    Key_TPToTarget          = Enum.KeyCode.T,
+    Key_SkipTarget          = Enum.KeyCode.G,
+    Key_SoruSilent          = Enum.KeyCode.R,
+
+    -- [RAGE -> MISC]
+    InvisiblePlus           = false,
+    InfiniteGeppo           = false,
+    InfiniteEnergy          = false,
+    NoFog                   = false,
+    FullBright              = false,
+    WhiteScreen             = false,
+    FPSBoost                = false,
+    AutoRejoin              = true
+}
+
+local Config = getgenv().HermanosConfig
+
+-- Config File Persistence Manager
+local ConfigFolderName = "HermanosDev_Config"
+local ConfigFileName = ConfigFolderName .. "/BloxFruits_PVP_v09.json"
+
+local function SaveConfiguration()
+    if not writefile then return false end
+    pcall(function()
+        if makefolder and isfolder and not isfolder(ConfigFolderName) then
+            makefolder(ConfigFolderName)
+        end
+        local serializable = {}
+        for k, v in pairs(Config) do
+            if typeof(v) == "EnumItem" then
+                serializable[k] = v.Name
+            else
+                serializable[k] = v
+            end
+        end
+        writefile(ConfigFileName, HttpService:JSONEncode(serializable))
+    end)
+    return true
+end
+
+local function LoadConfiguration()
+    if not readfile or not isfile or not isfile(ConfigFileName) then return false end
+    local ok, decoded = pcall(function()
+        return HttpService:JSONDecode(readfile(ConfigFileName))
+    end)
+    if ok and type(decoded) == "table" then
+        for k, v in pairs(decoded) do
+            if Config[k] ~= nil then
+                if typeof(Config[k]) == "EnumItem" and type(v) == "string" and Enum.KeyCode[v] then
+                    Config[k] = Enum.KeyCode[v]
+                else
+                    Config[k] = v
+                end
+            end
+        end
+        return true
+    end
+    return false
+end
+
+LoadConfiguration()
+
+local State = {
+    Running                 = true,
+    CurrentTarget           = nil,
+    LockedTarget            = nil,
+    TargetHuntStartTick     = 0,
+    BlacklistedTargets      = {},
+    IsSafeZoneRetreating    = false,
+    LastBusoTick            = 0,
+    LastKenTick             = 0,
+    LastRaceV3Tick          = 0,
+    LastRaceV4Tick          = 0,
+    LastAttackTick          = 0,
+    LastSkillTick           = 0,
+    LastGCPatchTick         = 0,
+    ComboCounter            = 1,
+    WeaponCycleIndex        = 1,
+    OriginalEnergy          = nil,
+    Connections             = {},
+    ESPObjects              = {},
+    WidgetUpdaters          = {}
+}
+
+-- ========================================================================================
+-- [SECTION 4] BLOX FRUITS SEA 1, SEA 2 & SEA 3 INTERNAL OFFSETS & COORDINATE TABLES
+-- ========================================================================================
+-- PlaceId detection across First Sea, Second Sea, and Third Sea
+local PlaceId = game.PlaceId
+local IsSea1 = (PlaceId == 2753915549)
+local IsSea2 = (PlaceId == 4442272183 or PlaceId == 79091703265657)
+local IsSea3 = (PlaceId == 7449423635 or PlaceId == 100117331123089)
+
+-- Verified Portal Entrance Coordinates for 'CommF_:InvokeServer("requestEntrance", Vector3)'
+local PortalLocations = {
+    Sea3 = {
+        ["Castle On The Sea"] = Vector3.new(-5058.77490234375, 314.5155029296875, -3155.88330078125),
+        ["Hydra Island"]      = Vector3.new(5756.83740234375, 610.4240112304688, -253.9253692626953),
+        ["Floating Turtle"]   = Vector3.new(-12463.8740234375, 374.9144592285156, -7523.77392578125),
+        ["Great Tree"]        = Vector3.new(28282.5703125, 14896.8505859375, 105.1042709350586),
+        ["Temple Of Time"]    = Vector3.new(28286.35546875, 14895.3017578125, 102.62469482421875)
+    },
+    Sea2 = {
+        ["Mansion"]           = Vector3.new(-288.46246337890625, 306.130615234375, 597.9988403320312),
+        ["Flamingo Room"]     = Vector3.new(2284.912109375, 15.152046203613281, 905.48291015625),
+        ["Cursed Ship"]       = Vector3.new(923.21252441406, 126.9760055542, 32852.83203125),
+        ["Zombie Island"]     = Vector3.new(-6508.5581054688, 89.034996032715, -132.83953857422)
+    },
+    Sea1 = {
+        ["Sky Island 1"]      = Vector3.new(-4607.82275, 872.54248, -1667.55688),
+        ["Sky Island 2"]      = Vector3.new(-7894.6176757813, 5547.1416015625, -380.29119873047),
+        ["Under Water City"]  = Vector3.new(61163.8515625, 11.6796875, 1819.7841796875),
+        ["Whirlpool"]         = Vector3.new(3864.6884765625, 6.736950397491455, -1926.214111328125)
+    }
+}
+
+-- Island Teleport Waypoints per Sea
+local IslandWaypoints = {
+    Sea3 = {
+        ["Castle On The Sea"] = CFrame.new(-5074.45, 314.51, -2991.05),
+        ["Port Town"]         = CFrame.new(-290.73, 6.72, 5343.55),
+        ["Hydra Island"]      = CFrame.new(5228.88, 604.23, 345.04),
+        ["Great Tree"]        = CFrame.new(2681.27, 1682.80, -7190.98),
+        ["Floating Turtle"]   = CFrame.new(-13274.52, 531.82, -7579.22),
+        ["Mansion"]           = CFrame.new(-12463.87, 374.91, -7523.77),
+        ["Haunted Castle"]    = CFrame.new(-9515.37, 164.00, 5786.06),
+        ["Sea Of Treats"]     = CFrame.new(-1145.42, 14.80, -14445.60),
+        ["Tiki Outpost"]      = CFrame.new(-16218.60, 9.08, 445.61)
+    },
+    Sea2 = {
+        ["Cafe"]              = CFrame.new(-380.47, 77.22, 255.82),
+        ["Kingdom Of Rose"]   = CFrame.new(-394.98, 118.50, 1245.84),
+        ["Green Zone"]        = CFrame.new(-2448.53, 73.01, -3210.63),
+        ["Graveyard"]         = CFrame.new(-5411.47, 48.51, -721.22),
+        ["Snow Mountain"]     = CFrame.new(753.14, 408.23, -5274.61),
+        ["Hot And Cold"]      = CFrame.new(-5924.11, 15.97, -5096.95),
+        ["Cursed Ship"]       = CFrame.new(923.21, 126.97, 32852.83),
+        ["Ice Castle"]        = CFrame.new(5505.87, 40.42, -6178.43),
+        ["Forgotten Island"]  = CFrame.new(-3032.76, 317.89, -10075.37)
+    },
+    Sea1 = {
+        ["Middle Town"]       = CFrame.new(-655.82, 7.88, 1436.67),
+        ["Jungle"]            = CFrame.new(-1601.65, 36.85, 153.38),
+        ["Pirate Village"]    = CFrame.new(-1181.30, 4.75, 3803.54),
+        ["Desert"]            = CFrame.new(944.15, 20.91, 4373.30),
+        ["Frozen Village"]    = CFrame.new(1347.80, 104.66, -1319.73),
+        ["Marine Fortress"]   = CFrame.new(-4505.37, 20.68, 4260.55),
+        ["Skylands"]          = CFrame.new(-4869.10, 733.46, -2667.01),
+        ["Prison"]            = CFrame.new(4875.33, 5.65, 734.85),
+        ["Fountain City"]     = CFrame.new(5127.12, 59.50, 4105.44)
+    }
+}
+
+-- ========================================================================================
+-- [SECTION 5] BLOX FRUITS REMOTES & COMBAT NETWORKING RESOLVER
+-- ========================================================================================
+-- Standard Blox Fruits ReplicatedStorage.Remotes & Modules.Net structure
+local RemotesFolder = ReplicatedStorage:FindFirstChild("Remotes")
+local CommF_ = RemotesFolder and RemotesFolder:FindFirstChild("CommF_")
+local CommE  = RemotesFolder and RemotesFolder:FindFirstChild("CommE")
+
+local RegisterAttack = nil
+local RegisterHit = nil
+
+local function ResolveCombatNet()
+    pcall(function()
+        local Modules = ReplicatedStorage:FindFirstChild("Modules")
+        local Net = Modules and Modules:FindFirstChild("Net")
+        if Net then
+            RegisterAttack = Net:FindFirstChild("RE/RegisterAttack")
+            RegisterHit = Net:FindFirstChild("RE/RegisterHit")
+        end
+    end)
+end
+ResolveCombatNet()
+
+local function GetCharacter(plr)
+    plr = plr or LocalPlayer
+    return plr and plr.Character
+end
+
+local function GetRootPart(plr)
+    local char = GetCharacter(plr)
+    return char and char:FindFirstChild("HumanoidRootPart")
+end
+
+local function GetHumanoid(plr)
+    local char = GetCharacter(plr)
+    return char and char:FindFirstChildOfClass("Humanoid")
+end
+
+local function IsPlayerAlive(plr)
+    local hum = GetHumanoid(plr)
+    local hrp = GetRootPart(plr)
+    return (hum ~= nil and hrp ~= nil and hum.Health > 0)
+end
+
+local function FormatCompactNumber(n)
+    n = tonumber(n) or 0
+    if n >= 1e9 then
+        return string.format("%.2fB", n / 1e9)
+    elseif n >= 1e6 then
+        return string.format("%.2fM", n / 1e6)
+    elseif n >= 1e3 then
+        return string.format("%.1fK", n / 1e3)
+    end
+    return tostring(math.floor(n))
+end
+
+-- Evaluates if a portal entrance via CommF_ brings the player closer to the destination
+local function TryPortalBypass(targetPos)
+    if not Config.BypassTP or not CommF_ then return false end
+    local myHrp = GetRootPart(LocalPlayer)
+    if not myHrp then return false end
+
+    local activePortalMap = IsSea3 and PortalLocations.Sea3 or (IsSea2 and PortalLocations.Sea2 or (IsSea1 and PortalLocations.Sea1 or nil))
+    if not activePortalMap then return false end
+
+    local currentDist = (myHrp.Position - targetPos).Magnitude
+    local bestPortalVec = nil
+    local shortestDist = currentDist
+
+    for _, portalVec in pairs(activePortalMap) do
+        local distFromPortal = (portalVec - targetPos).Magnitude
+        if (distFromPortal + 300) < shortestDist then
+            shortestDist = distFromPortal
+            bestPortalVec = portalVec
+        end
+    end
+
+    if bestPortalVec then
+        pcall(function()
+            CommF_:InvokeServer("requestEntrance", bestPortalVec)
+        end)
+        return true
+    end
+    return false
+end
+
+local function SendKeyPress(keyCode, holdDuration)
+    holdDuration = tonumber(holdDuration) or 0.05
+    task.spawn(function()
+        if VirtualInputManager then
+            VirtualInputManager:SendKeyEvent(true, keyCode, false, game)
+            if holdDuration > 0 then
+                task.wait(holdDuration)
+            end
+            VirtualInputManager:SendKeyEvent(false, keyCode, false, game)
+        end
+    end)
+end
+
+-- Determines Blox Fruits PvP Status: 'InCombat', 'Disable Pvp', or 'Ready Pvp'
+local function GetPlayerPvpState(plr)
+    local char = GetCharacter(plr)
+    if not char then return "Disable Pvp" end
+    if char:FindFirstChildOfClass("ForceField") then
+        return "Disable Pvp"
+    end
+    if char:GetAttribute("PvpDisabled") == true or plr:GetAttribute("PvpDisabled") == true then
+        return "Disable Pvp"
+    end
+    local gui = plr:FindFirstChild("PlayerGui")
+    local mainGui = gui and gui:FindFirstChild("Main")
+    if mainGui and mainGui:FindFirstChild("PvpDisabled") and mainGui.PvpDisabled.Visible then
+        return "Disable Pvp"
+    end
+
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local worldOrigin = Workspace:FindFirstChild("_WorldOrigin")
+    local safeZones = worldOrigin and worldOrigin:FindFirstChild("SafeZones")
+    if hrp and safeZones then
+        for _, zone in ipairs(safeZones:GetChildren()) do
+            if zone:IsA("BasePart") then
+                local dist = (hrp.Position - zone.Position).Magnitude
+                if dist <= (math.max(zone.Size.X, zone.Size.Z) * 0.55) then
+                    return "Disable Pvp"
+                end
+            end
+        end
+    end
+
+    if char:GetAttribute("InCombat") == true or plr:GetAttribute("InCombat") == true or char:FindFirstChild("InCombat") then
+        return "InCombat"
+    end
+    return "Ready Pvp"
+end
+
+-- Detects Observation (Ken) Haki active state on target players
+local function IsPlayerKenActive(plr)
+    local char = GetCharacter(plr)
+    if not char then return false end
+    if char:GetAttribute("KenActive") == true or char:GetAttribute("Observation") == true then
+        return true
+    end
+    if char:FindFirstChild("KenHaki") or char:FindFirstChild("Observation") then
+        return true
+    end
+    return false
+end
+
+-- Computes FOV Circle center based on 'Middle', 'Mouse', or 'Target' mode[cite: 10]
+local function GetFOVOrigin()
+    local vpSize = Camera.ViewportSize
+    if Config.FOVMode == "Mouse" then
+        return UserInputService:GetMouseLocation()
+    elseif Config.FOVMode == "Target" then
+        local active = State.LockedTarget or State.CurrentTarget
+        if active and IsPlayerAlive(active) then
+            local tHrp = GetRootPart(active)
+            if tHrp then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(tHrp.Position)
+                if onScreen then
+                    return Vector2.new(screenPos.X, screenPos.Y)
+                end
+            end
+        end
+    end
+    return Vector2.new(vpSize.X * 0.5, vpSize.Y * 0.5)
+end
+
+-- Selects optimal PvP target inside Aim Range and FOV Circle[cite: 10]
+local function GetBestTarget()
+    if State.LockedTarget and IsPlayerAlive(State.LockedTarget) then
+        local myHrp = GetRootPart(LocalPlayer)
+        local tHrp = GetRootPart(State.LockedTarget)
+        if myHrp and tHrp and (myHrp.Position - tHrp.Position).Magnitude <= Config.AimRange then
+            return State.LockedTarget
+        else
+            State.LockedTarget = nil
+        end
+    end
+
+    local myHrp = GetRootPart(LocalPlayer)
+    if not myHrp then return nil end
+
+    local fovOrigin = GetFOVOrigin()
+    local maxRadius = Config.FOVSize * 0.5
+    local bestCandidate = nil
+    local shortestScreenDist = maxRadius
+
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and not State.BlacklistedTargets[plr.UserId] and IsPlayerAlive(plr) then
+            local isFriend = false
+            if Config.SkipFriends then
+                pcall(function() isFriend = LocalPlayer:IsFriendsWith(plr.UserId) end)
+            end
+
+            local alliedMarine = (LocalPlayer.Team and plr.Team and LocalPlayer.Team.Name == "Marines" and plr.Team.Name == "Marines")
+
+            if not isFriend and not alliedMarine then
+                local tChar = GetCharacter(plr)
+                local hasV4 = tChar and (tChar:FindFirstChild("RaceTransformed") or tChar:GetAttribute("RaceTransformed") == true)
+                local pvpState = GetPlayerPvpState(plr)
+
+                if not (Config.SkipRaceV4 and hasV4) and pvpState ~= "Disable Pvp" then
+                    local tHrp = GetRootPart(plr)
+                    local worldDist = (myHrp.Position - tHrp.Position).Magnitude
+                    if worldDist <= Config.AimRange then
+                        local screenPos, onScreen = Camera:WorldToViewportPoint(tHrp.Position)
+                        if onScreen then
+                            local screenDist = (Vector2.new(screenPos.X, screenPos.Y) - fovOrigin).Magnitude
+                            if screenDist <= shortestScreenDist then
+                                shortestScreenDist = screenDist
+                                bestCandidate = plr
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    return bestCandidate
+end
+
+-- ========================================================================================
+-- [SECTION 6] SCREENGUI, NOTIFICATION ENGINE & LIVE TARGET HUD PANEL
+-- ========================================================================================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "HermanosDev_PVP_Hub"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.IgnoreGuiInset = true
+ScreenGui.Parent = ParentGui
+
+-- 1. White Screen GPU-Saver Overlay
+local WhiteScreenFrame = Instance.new("Frame")
+WhiteScreenFrame.Name = "WhiteScreenOverlay"
+WhiteScreenFrame.Size = UDim2.fromScale(1, 1)
+WhiteScreenFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+WhiteScreenFrame.BorderSizePixel = 0
+WhiteScreenFrame.Visible = Config.WhiteScreen
+WhiteScreenFrame.ZIndex = 1
+WhiteScreenFrame.Parent = ScreenGui
+
+local WhiteScreenLabel = Instance.new("TextLabel")
+WhiteScreenLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+WhiteScreenLabel.Position = UDim2.fromScale(0.5, 0.5)
+WhiteScreenLabel.Size = UDim2.fromOffset(420, 60)
+WhiteScreenLabel.BackgroundTransparency = 1
+WhiteScreenLabel.Font = Enum.Font.GothamBold
+WhiteScreenLabel.Text = "Hermanos'Dev | PVP - White Screen AFK Mode Active"
+WhiteScreenLabel.TextColor3 = Color3.fromRGB(30, 32, 38)
+WhiteScreenLabel.TextSize = 16
+WhiteScreenLabel.Parent = WhiteScreenFrame
+
+-- 2. Translucent Notification Stack
+local NotificationHolder = Instance.new("Frame")
+NotificationHolder.Name = "NotificationHolder"
+NotificationHolder.AnchorPoint = Vector2.new(1, 1)
+NotificationHolder.Position = UDim2.new(1, -18, 1, -18)
+NotificationHolder.Size = UDim2.fromOffset(260, 300)
+NotificationHolder.BackgroundTransparency = 1
+NotificationHolder.ZIndex = 30
+NotificationHolder.Parent = ScreenGui
+
+local NotifListLayout = Instance.new("UIListLayout")
+NotifListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+NotifListLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
+NotifListLayout.Padding = UDim.new(0, 8)
+NotifListLayout.Parent = NotificationHolder
+
+local function Notify(titleText, bodyText, duration)
+    duration = duration or 3
+    task.spawn(function()
+        local notifCard = Instance.new("Frame")
+        notifCard.Size = UDim2.new(1, 0, 0, 54)
+        notifCard.BackgroundColor3 = Theme.WindowBg
+        notifCard.BackgroundTransparency = 0.12
+        notifCard.ZIndex = 31
+        notifCard.Parent = NotificationHolder
+
+        local nCorner = Instance.new("UICorner")
+        nCorner.CornerRadius = UDim.new(0, 8)
+        nCorner.Parent = notifCard
+
+        local nStroke = Instance.new("UIStroke")
+        nStroke.Color = Theme.CheckboxOn
+        nStroke.Thickness = 1
+        nStroke.Transparency = 0.25
+        nStroke.Parent = notifCard
+
+        local nIcon = Instance.new("ImageLabel")
+        nIcon.AnchorPoint = Vector2.new(0, 0.5)
+        nIcon.Position = UDim2.new(0, 12, 0.5, 0)
+        nIcon.Size = UDim2.fromOffset(18, 18)
+        nIcon.BackgroundTransparency = 1
+        nIcon.Image = LucideIcons.Bell
+        nIcon.ImageColor3 = Theme.CheckboxOn
+        nIcon.ZIndex = 32
+        nIcon.Parent = notifCard
+
+        local nTitle = Instance.new("TextLabel")
+        nTitle.Position = UDim2.new(0, 38, 0, 8)
+        nTitle.Size = UDim2.new(1, -46, 0, 16)
+        nTitle.BackgroundTransparency = 1
+        nTitle.Font = Enum.Font.GothamBold
+        nTitle.Text = tostring(titleText)
+        nTitle.TextColor3 = Theme.TextPrimary
+        nTitle.TextSize = 12
+        nTitle.TextXAlignment = Enum.TextXAlignment.Left
+        nTitle.ZIndex = 32
+        nTitle.Parent = notifCard
+
+        local nBody = Instance.new("TextLabel")
+        nBody.Position = UDim2.new(0, 38, 0, 26)
+        nBody.Size = UDim2.new(1, -46, 0, 20)
+        nBody.BackgroundTransparency = 1
+        nBody.Font = Enum.Font.Gotham
+        nBody.Text = tostring(bodyText)
+        nBody.TextColor3 = Theme.TextSecondary
+        nBody.TextSize = 11
+        nBody.TextWrapped = true
+        nBody.TextXAlignment = Enum.TextXAlignment.Left
+        nBody.ZIndex = 32
+        nBody.Parent = notifCard
+
+        task.wait(duration)
+        TweenService:Create(notifCard, TweenInfo.new(0.25), {
+            BackgroundTransparency = 1
+        }):Play()
+        TweenService:Create(nTitle, TweenInfo.new(0.25), { TextTransparency = 1 }):Play()
+        TweenService:Create(nBody, TweenInfo.new(0.25), { TextTransparency = 1 }):Play()
+        TweenService:Create(nIcon, TweenInfo.new(0.25), { ImageTransparency = 1 }):Play()
+        TweenService:Create(nStroke, TweenInfo.new(0.25), { Transparency = 1 }):Play()
+        task.wait(0.28)
+        notifCard:Destroy()
+    end)
+end
+
+-- 3. Centered Yellow FOV Circle Overlay[cite: 10]
+local FOVCircleFrame = Instance.new("Frame")
+FOVCircleFrame.Name = "FOVCircle"
+FOVCircleFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+FOVCircleFrame.Position = UDim2.fromScale(0.5, 0.5)
+FOVCircleFrame.Size = UDim2.fromOffset(Config.FOVSize, Config.FOVSize)
+FOVCircleFrame.BackgroundTransparency = 1
+FOVCircleFrame.Visible = Config.ShowFOV
+FOVCircleFrame.ZIndex = 2
+FOVCircleFrame.Parent = ScreenGui
+
+local FOVCorner = Instance.new("UICorner")
+FOVCorner.CornerRadius = UDim.new(1, 0)
+FOVCorner.Parent = FOVCircleFrame
+
+local FOVStroke = Instance.new("UIStroke")
+FOVStroke.Color = Theme.FovYellow
+FOVStroke.Thickness = 1.4
+FOVStroke.Transparency = 0.08
+FOVStroke.Parent = FOVCircleFrame
+
+-- 4. Compact Top-Center Target Telemetry Pill
+local TargetHudFrame = Instance.new("Frame")
+TargetHudFrame.Name = "TargetHudPanel"
+TargetHudFrame.AnchorPoint = Vector2.new(0.5, 0)
+TargetHudFrame.Position = UDim2.new(0.5, 0, 0, 14)
+TargetHudFrame.Size = UDim2.fromOffset(235, 46)
+TargetHudFrame.BackgroundColor3 = Theme.WindowBg
+TargetHudFrame.BackgroundTransparency = 0.18
+TargetHudFrame.Visible = false
+TargetHudFrame.ZIndex = 8
+TargetHudFrame.Parent = ScreenGui
+
+local TargetHudCorner = Instance.new("UICorner")
+TargetHudCorner.CornerRadius = UDim.new(0, 8)
+TargetHudCorner.Parent = TargetHudFrame
+
+local TargetHudStroke = Instance.new("UIStroke")
+TargetHudStroke.Color = Color3.fromRGB(58, 62, 72)
+TargetHudStroke.Thickness = 1
+TargetHudStroke.Transparency = 0.3
+TargetHudStroke.Parent = TargetHudFrame
+
+local TargetHudIcon = Instance.new("ImageLabel")
+TargetHudIcon.AnchorPoint = Vector2.new(0, 0.5)
+TargetHudIcon.Position = UDim2.new(0, 10, 0.5, 0)
+TargetHudIcon.Size = UDim2.fromOffset(18, 18)
+TargetHudIcon.BackgroundTransparency = 1
+TargetHudIcon.Image = LucideIcons.Target
+TargetHudIcon.ImageColor3 = Theme.HudRedText
+TargetHudIcon.ZIndex = 9
+TargetHudIcon.Parent = TargetHudFrame
+
+local TargetHudName = Instance.new("TextLabel")
+TargetHudName.Position = UDim2.new(0, 36, 0, 6)
+TargetHudName.Size = UDim2.new(1, -44, 0, 16)
+TargetHudName.BackgroundTransparency = 1
+TargetHudName.Font = Enum.Font.GothamBold
+TargetHudName.Text = "Target: None"
+TargetHudName.TextColor3 = Theme.TextPrimary
+TargetHudName.TextSize = 12
+TargetHudName.TextXAlignment = Enum.TextXAlignment.Left
+TargetHudName.ZIndex = 9
+TargetHudName.Parent = TargetHudFrame
+
+local TargetHudBarBg = Instance.new("Frame")
+TargetHudBarBg.Position = UDim2.new(0, 36, 0, 27)
+TargetHudBarBg.Size = UDim2.new(1, -46, 0, 10)
+TargetHudBarBg.BackgroundColor3 = Color3.fromRGB(32, 34, 42)
+TargetHudBarBg.ZIndex = 9
+TargetHudBarBg.Parent = TargetHudFrame
+
+local TargetHudBarCorner = Instance.new("UICorner")
+TargetHudBarCorner.CornerRadius = UDim.new(1, 0)
+TargetHudBarCorner.Parent = TargetHudBarBg
+
+local TargetHudBarFill = Instance.new("Frame")
+TargetHudBarFill.Size = UDim2.fromScale(1, 1)
+TargetHudBarFill.BackgroundColor3 = Theme.SuccessGreen
+TargetHudBarFill.ZIndex = 10
+TargetHudBarFill.Parent = TargetHudBarBg
+
+local TargetHudBarFillCorner = Instance.new("UICorner")
+TargetHudBarFillCorner.CornerRadius = UDim.new(1, 0)
+TargetHudBarFillCorner.Parent = TargetHudBarFill
+
+local TargetHudHpText = Instance.new("TextLabel")
+TargetHudHpText.Size = UDim2.fromScale(1, 1)
+TargetHudHpText.BackgroundTransparency = 1
+TargetHudHpText.Font = Enum.Font.GothamBold
+TargetHudHpText.Text = "100%"
+TargetHudHpText.TextColor3 = Color3.fromRGB(255, 255, 255)
+TargetHudHpText.TextSize = 9
+TargetHudHpText.ZIndex = 11
+TargetHudHpText.Parent = TargetHudBarBg
+
+-- ========================================================================================
+-- [SECTION 7] 1:1 HERMANOS'DEV TRANSLUCENT ACRYLIC GUI ENGINE
+-- ========================================================================================
+-- Floating Left-Side Mobile Action Buttons ('Camera Lock' & 'TP To Target')
+local function CreateFloatingActionBtn(name, labelText, posOffset, onClickCallback)
+    local btn = Instance.new("TextButton")
+    btn.Name = name
+    btn.Position = posOffset
+    btn.Size = UDim2.fromOffset(132, 44)
+    btn.BackgroundColor3 = Theme.HudButtonBg
+    btn.BackgroundTransparency = Theme.HudButtonTrans
+    btn.AutoButtonColor = false
+    btn.Font = Enum.Font.GothamBold
+    btn.Text = labelText
+    btn.TextColor3 = Theme.HudRedText
+    btn.TextSize = 15
+    btn.ZIndex = 15
+    btn.Parent = ScreenGui
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = btn
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(50, 52, 60)
+    stroke.Thickness = 1.2
+    stroke.Transparency = 0.3
+    stroke.Parent = btn
+
+    local dragging, dragStart, startPos, moved = false, nil, nil, false
+    btn.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            moved = false
+            dragStart = input.Position
+            startPos = btn.Position
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            if delta.Magnitude > 6 then
+                moved = true
+                btn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            end
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            if dragging and not moved then
+                onClickCallback(btn, stroke)
+            end
+            dragging = false
+        end
+    end)
+
+    return btn, stroke
+end
+
+local CamLockBtn, CamLockStroke = CreateFloatingActionBtn(
+    "CameraLockButton",
+    "Camera Lock",
+    UDim2.new(0, 78, 0, 96),
+    function(btn, stroke)
+        Config.CameraLock = not Config.CameraLock
+        if Config.CameraLock then
+            State.LockedTarget = GetBestTarget()
+            stroke.Color = Theme.HudRedText
+            stroke.Transparency = 0
+            btn.Text = "Camera Lock"
+            Notify("Camera Lock", State.LockedTarget and ("Locked onto " .. State.LockedTarget.Name) or "Camera Lock Enabled", 2)
+        else
+            State.LockedTarget = nil
+            stroke.Color = Color3.fromRGB(50, 52, 60)
+            stroke.Transparency = 0.3
+            btn.Text = "Camera Lock"
+            Notify("Camera Lock", "Camera Lock Disabled", 2)
+        end
+    end
+)
+
+local TPTargetBtn, TPTargetStroke = CreateFloatingActionBtn(
+    "TPToTargetButton",
+    "TP To Target",
+    UDim2.new(0, 78, 0, 152),
+    function(_, stroke)
+        local target = State.LockedTarget or State.CurrentTarget or GetBestTarget()
+        if target and IsPlayerAlive(target) then
+            local myHrp = GetRootPart(LocalPlayer)
+            local tHrp = GetRootPart(target)
+            if myHrp and tHrp then
+                stroke.Color = Theme.CheckboxOn
+                TryPortalBypass(tHrp.Position)
+                myHrp.CFrame = tHrp.CFrame * CFrame.new(0, Config.TeleportOffsetY, Config.TeleportOffsetZ)
+                task.delay(0.25, function()
+                    stroke.Color = Color3.fromRGB(50, 52, 60)
+                end)
+            end
+        else
+            Notify("TP To Target", "No valid target inside Aim Range", 2)
+        end
+    end
+)
+
+-- Floating Top-Right Red-Bordered Toggle Badge ('</>')
+local FloatingToggleBtn = Instance.new("TextButton")
+FloatingToggleBtn.Name = "FloatingToggleIcon"
+FloatingToggleBtn.Position = UDim2.new(0.76, 0, 0.06, 0)
+FloatingToggleBtn.Size = UDim2.fromOffset(48, 48)
+FloatingToggleBtn.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
+FloatingToggleBtn.BackgroundTransparency = 0.1
+FloatingToggleBtn.Text = ""
+FloatingToggleBtn.ZIndex = 20
+FloatingToggleBtn.Parent = ScreenGui
+
+local FloatCorner = Instance.new("UICorner")
+FloatCorner.CornerRadius = UDim.new(0, 12)
+FloatCorner.Parent = FloatingToggleBtn
+
+local FloatStroke = Instance.new("UIStroke")
+FloatStroke.Color = Color3.fromRGB(205, 32, 38)
+FloatStroke.Thickness = 2
+FloatStroke.Parent = FloatingToggleBtn
+
+local FloatBadgeCircle = Instance.new("Frame")
+FloatBadgeCircle.AnchorPoint = Vector2.new(0.5, 0.42)
+FloatBadgeCircle.Position = UDim2.fromScale(0.5, 0.42)
+FloatBadgeCircle.Size = UDim2.fromOffset(22, 22)
+FloatBadgeCircle.BackgroundColor3 = Color3.fromRGB(245, 165, 35)
+FloatBadgeCircle.Parent = FloatingToggleBtn
+
+local FloatBadgeCircleCorner = Instance.new("UICorner")
+FloatBadgeCircleCorner.CornerRadius = UDim.new(1, 0)
+FloatBadgeCircleCorner.Parent = FloatBadgeCircle
+
+local FloatFaceLabel = Instance.new("TextLabel")
+FloatFaceLabel.Size = UDim2.fromScale(1, 1)
+FloatFaceLabel.BackgroundTransparency = 1
+FloatFaceLabel.Font = Enum.Font.GothamBold
+FloatFaceLabel.Text = "''"
+FloatFaceLabel.TextColor3 = Color3.fromRGB(30, 20, 10)
+FloatFaceLabel.TextSize = 12
+FloatFaceLabel.Parent = FloatBadgeCircle
+
+local FloatCodeLabel = Instance.new("TextLabel")
+FloatCodeLabel.AnchorPoint = Vector2.new(0.5, 1)
+FloatCodeLabel.Position = UDim2.new(0.5, 0, 0.94, 0)
+FloatCodeLabel.Size = UDim2.new(1, 0, 0, 14)
+FloatCodeLabel.BackgroundTransparency = 1
+FloatCodeLabel.Font = Enum.Font.Code
+FloatCodeLabel.Text = "</>"
+FloatCodeLabel.TextColor3 = Color3.fromRGB(225, 45, 45)
+FloatCodeLabel.TextSize = 11
+FloatCodeLabel.Parent = FloatingToggleBtn
+
+-- Main Translucent Window Frame ('Hermanos'Dev | PVP')
+local NormalWindowSize = UDim2.fromOffset(550, 350)
+local MaxWindowSize    = UDim2.fromOffset(680, 430)
+
+local MainWindow = Instance.new("Frame")
+MainWindow.Name = "MainWindow"
+MainWindow.AnchorPoint = Vector2.new(0.5, 0.5)
+MainWindow.Position = UDim2.fromScale(0.49, 0.62)
+MainWindow.Size = Config.UI_Maximized and MaxWindowSize or NormalWindowSize
+MainWindow.BackgroundColor3 = Theme.WindowBg
+MainWindow.BackgroundTransparency = Theme.WindowTrans
+MainWindow.ClipsDescendants = true
+MainWindow.Visible = Config.UI_Visible
+MainWindow.ZIndex = 10
+MainWindow.Parent = ScreenGui
+
+local MainWindowCorner = Instance.new("UICorner")
+MainWindowCorner.CornerRadius = UDim.new(0, 10)
+MainWindowCorner.Parent = MainWindow
+
+local MainWindowStroke = Instance.new("UIStroke")
+MainWindowStroke.Color = Color3.fromRGB(58, 62, 72)
+MainWindowStroke.Thickness = 1
+MainWindowStroke.Transparency = 0.25
+MainWindowStroke.Parent = MainWindow
+
+-- Center Spiderweb Watermark Overlay
+local WatermarkWeb = Instance.new("ImageLabel")
+WatermarkWeb.Name = "SpiderWebWatermark"
+WatermarkWeb.AnchorPoint = Vector2.new(0.5, 0.5)
+WatermarkWeb.Position = UDim2.fromScale(0.46, 0.52)
+WatermarkWeb.Size = UDim2.fromOffset(240, 240)
+WatermarkWeb.BackgroundTransparency = 1
+WatermarkWeb.Image = LucideIcons.SpiderWeb
+WatermarkWeb.ImageColor3 = Color3.fromRGB(200, 205, 215)
+WatermarkWeb.ImageTransparency = 0.90
+WatermarkWeb.ZIndex = 10
+WatermarkWeb.Parent = MainWindow
+
+do
+    local fDragging, fStart, fPos, fMoved = false, nil, nil, false
+    FloatingToggleBtn.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            fDragging = true
+            fMoved = false
+            fStart = input.Position
+            fPos = FloatingToggleBtn.Position
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if fDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - fStart
+            if delta.Magnitude > 6 then
+                fMoved = true
+                FloatingToggleBtn.Position = UDim2.new(fPos.X.Scale, fPos.X.Offset + delta.X, fPos.Y.Scale, fPos.Y.Offset + delta.Y)
+            end
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            if fDragging and not fMoved then
+                Config.UI_Visible = not Config.UI_Visible
+                MainWindow.Visible = Config.UI_Visible
+            end
+            fDragging = false
+        end
+    end)
+end
+
+-- Top Header Bar ('Hermanos'Dev | PVP', '[⚔️] Blox Fruit | Boblox-Script.com', '0.9 - FREE', 'discord')[cite: 1, 4, 8]
+local HeaderBar = Instance.new("Frame")
+HeaderBar.Name = "HeaderBar"
+HeaderBar.Size = UDim2.new(1, 0, 0, 44)
+HeaderBar.BackgroundColor3 = Theme.HeaderBg
+HeaderBar.BackgroundTransparency = Theme.HeaderTrans
+HeaderBar.BorderSizePixel = 0
+HeaderBar.ZIndex = 12
+HeaderBar.Parent = MainWindow
+
+local HeaderCorner = Instance.new("UICorner")
+HeaderCorner.CornerRadius = UDim.new(0, 10)
+HeaderCorner.Parent = HeaderBar
+
+local HeaderDivider = Instance.new("Frame")
+HeaderDivider.Position = UDim2.new(0, 0, 1, -1)
+HeaderDivider.Size = UDim2.new(1, 0, 0, 1)
+HeaderDivider.BackgroundColor3 = Color3.fromRGB(48, 52, 62)
+HeaderDivider.BackgroundTransparency = 0.4
+HeaderDivider.BorderSizePixel = 0
+HeaderDivider.ZIndex = 12
+HeaderDivider.Parent = HeaderBar
+
+local LogoBox = Instance.new("Frame")
+LogoBox.AnchorPoint = Vector2.new(0, 0.5)
+LogoBox.Position = UDim2.new(0, 12, 0.5, 0)
+LogoBox.Size = UDim2.fromOffset(26, 26)
+LogoBox.BackgroundColor3 = Color3.fromRGB(30, 18, 20)
+LogoBox.ZIndex = 13
+LogoBox.Parent = HeaderBar
+
+local LogoCorner = Instance.new("UICorner")
+LogoCorner.CornerRadius = UDim.new(0, 6)
+LogoCorner.Parent = LogoBox
+
+local LogoStroke = Instance.new("UIStroke")
+LogoStroke.Color = Color3.fromRGB(195, 32, 38)
+LogoStroke.Thickness = 1.2
+LogoStroke.Parent = LogoBox
+
+local LogoIcon = Instance.new("ImageLabel")
+LogoIcon.AnchorPoint = Vector2.new(0.5, 0.5)
+LogoIcon.Position = UDim2.fromScale(0.5, 0.5)
+LogoIcon.Size = UDim2.fromOffset(16, 16)
+LogoIcon.BackgroundTransparency = 1
+LogoIcon.Image = LucideIcons.Flame
+LogoIcon.ImageColor3 = Color3.fromRGB(235, 85, 45)
+LogoIcon.ZIndex = 14
+LogoIcon.Parent = LogoBox
+
+local HeaderTitle = Instance.new("TextLabel")
+HeaderTitle.Position = UDim2.new(0, 46, 0, 6)
+HeaderTitle.Size = UDim2.new(0, 200, 0, 17)
+HeaderTitle.BackgroundTransparency = 1
+HeaderTitle.Font = Enum.Font.GothamBold
+HeaderTitle.Text = "Hermanos'Dev | PVP"
+HeaderTitle.TextColor3 = Theme.TextPrimary
+HeaderTitle.TextSize = 13
+HeaderTitle.TextXAlignment = Enum.TextXAlignment.Left
+HeaderTitle.ZIndex = 13
+HeaderTitle.Parent = HeaderBar
+
+local HeaderSubtitle = Instance.new("TextLabel")
+HeaderSubtitle.Position = UDim2.new(0, 46, 0, 23)
+HeaderSubtitle.Size = UDim2.new(0, 220, 0, 14)
+HeaderSubtitle.BackgroundTransparency = 1
+HeaderSubtitle.Font = Enum.Font.GothamMedium
+HeaderSubtitle.Text = "[⚔️] Blox Fruit | Boblox-Script.com"
+HeaderSubtitle.TextColor3 = Theme.TextSecondary
+HeaderSubtitle.TextSize = 10
+HeaderSubtitle.TextXAlignment = Enum.TextXAlignment.Left
+HeaderSubtitle.ZIndex = 13
+HeaderSubtitle.Parent = HeaderBar
+
+local FreeBadge = Instance.new("Frame")
+FreeBadge.AnchorPoint = Vector2.new(1, 0.5)
+FreeBadge.Position = UDim2.new(1, -158, 0.5, 0)
+FreeBadge.Size = UDim2.fromOffset(78, 22)
+FreeBadge.BackgroundColor3 = Theme.FreeBadgeRed
+FreeBadge.ZIndex = 13
+FreeBadge.Parent = HeaderBar
+
+local FreeBadgeCorner = Instance.new("UICorner")
+FreeBadgeCorner.CornerRadius = UDim.new(1, 0)
+FreeBadgeCorner.Parent = FreeBadge
+
+local FreeBadgeIcon = Instance.new("ImageLabel")
+FreeBadgeIcon.AnchorPoint = Vector2.new(0, 0.5)
+FreeBadgeIcon.Position = UDim2.new(0, 7, 0.5, 0)
+FreeBadgeIcon.Size = UDim2.fromOffset(12, 12)
+FreeBadgeIcon.BackgroundTransparency = 1
+FreeBadgeIcon.Image = LucideIcons.Flame
+FreeBadgeIcon.ImageColor3 = Color3.fromRGB(255, 255, 255)
+FreeBadgeIcon.ZIndex = 14
+FreeBadgeIcon.Parent = FreeBadge
+
+local FreeBadgeText = Instance.new("TextLabel")
+FreeBadgeText.Position = UDim2.new(0, 22, 0, 0)
+FreeBadgeText.Size = UDim2.new(1, -26, 1, 0)
+FreeBadgeText.BackgroundTransparency = 1
+FreeBadgeText.Font = Enum.Font.GothamBold
+FreeBadgeText.Text = "0.9 - FREE"
+FreeBadgeText.TextColor3 = Color3.fromRGB(255, 255, 255)
+FreeBadgeText.TextSize = 10
+FreeBadgeText.TextXAlignment = Enum.TextXAlignment.Left
+FreeBadgeText.ZIndex = 14
+FreeBadgeText.Parent = FreeBadge
+
+local DiscordBtn = Instance.new("TextButton")
+DiscordBtn.AnchorPoint = Vector2.new(1, 0.5)
+DiscordBtn.Position = UDim2.new(1, -82, 0.5, 0)
+DiscordBtn.Size = UDim2.fromOffset(68, 22)
+DiscordBtn.BackgroundColor3 = Theme.DiscordPillBg
+DiscordBtn.AutoButtonColor = true
+DiscordBtn.Text = ""
+DiscordBtn.ZIndex = 13
+DiscordBtn.Parent = HeaderBar
+
+local DiscordCorner = Instance.new("UICorner")
+DiscordCorner.CornerRadius = UDim.new(1, 0)
+DiscordCorner.Parent = DiscordBtn
+
+local DiscordIcon = Instance.new("ImageLabel")
+DiscordIcon.AnchorPoint = Vector2.new(0, 0.5)
+DiscordIcon.Position = UDim2.new(0, 8, 0.5, 0)
+DiscordIcon.Size = UDim2.fromOffset(11, 11)
+DiscordIcon.BackgroundTransparency = 1
+DiscordIcon.Image = LucideIcons.Link
+DiscordIcon.ImageColor3 = Theme.DiscordText
+DiscordIcon.ZIndex = 14
+DiscordIcon.Parent = DiscordBtn
+
+local DiscordLabel = Instance.new("TextLabel")
+DiscordLabel.Position = UDim2.new(0, 22, 0, 0)
+DiscordLabel.Size = UDim2.new(1, -24, 1, 0)
+DiscordLabel.BackgroundTransparency = 1
+DiscordLabel.Font = Enum.Font.GothamBold
+DiscordLabel.Text = "discord"
+DiscordLabel.TextColor3 = Theme.DiscordText
+DiscordLabel.TextSize = 10
+DiscordLabel.TextXAlignment = Enum.TextXAlignment.Left
+DiscordLabel.ZIndex = 14
+DiscordLabel.Parent = DiscordBtn
+
+DiscordBtn.MouseButton1Click:Connect(function()
+    setclipboard("https://discord.gg/tgnNk89jdc")
+    DiscordLabel.Text = "copied!"
+    Notify("Hermanos'Dev Discord", "Discord invite link copied to clipboard!", 2.5)
+    task.delay(1.2, function()
+        DiscordLabel.Text = "discord"
+    end)
+end)
+
+local function CreateWinCtrlBtn(iconId, rightOffset, callback)
+    local btn = Instance.new("TextButton")
+    btn.AnchorPoint = Vector2.new(1, 0.5)
+    btn.Position = UDim2.new(1, rightOffset, 0.5, 0)
+    btn.Size = UDim2.fromOffset(20, 20)
+    btn.BackgroundTransparency = 1
+    btn.Text = ""
+    btn.ZIndex = 14
+    btn.Parent = HeaderBar
+
+    local ico = Instance.new("ImageLabel")
+    ico.AnchorPoint = Vector2.new(0.5, 0.5)
+    ico.Position = UDim2.fromScale(0.5, 0.5)
+    ico.Size = UDim2.fromOffset(13, 13)
+    ico.BackgroundTransparency = 1
+    ico.Image = iconId
+    ico.ImageColor3 = Theme.TextSecondary
+    ico.ZIndex = 14
+    ico.Parent = btn
+
+    btn.MouseButton1Click:Connect(callback)
+    return btn
+end
+
+CreateWinCtrlBtn(LucideIcons.Minus, -54, function()
+    Config.UI_Visible = false
+    MainWindow.Visible = false
+end)
+
+CreateWinCtrlBtn(LucideIcons.Maximize, -32, function()
+    Config.UI_Maximized = not Config.UI_Maximized
+    TweenService:Create(MainWindow, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        Size = Config.UI_Maximized and MaxWindowSize or NormalWindowSize
+    }):Play()
+end)
+
+CreateWinCtrlBtn(LucideIcons.Close, -10, function()
+    Config.UI_Visible = false
+    MainWindow.Visible = false
+end)
+
+do
+    local wDragging, wDragStart, wStartPos = false, nil, nil
+    HeaderBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            wDragging = true
+            wDragStart = input.Position
+            wStartPos = MainWindow.Position
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if wDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - wDragStart
+            MainWindow.Position = UDim2.new(
+                wStartPos.X.Scale,
+                wStartPos.X.Offset + delta.X,
+                wStartPos.Y.Scale,
+                wStartPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            wDragging = false
+        end
+    end)
+end
+
+-- Left Navigation Sidebar & Search Bar[cite: 7, 8]
+local SidebarFrame = Instance.new("Frame")
+SidebarFrame.Name = "Sidebar"
+SidebarFrame.Position = UDim2.new(0, 0, 0, 44)
+SidebarFrame.Size = UDim2.new(0, 155, 1, -44)
+SidebarFrame.BackgroundColor3 = Theme.SidebarBg
+SidebarFrame.BackgroundTransparency = Theme.SidebarTrans
+SidebarFrame.BorderSizePixel = 0
+SidebarFrame.ZIndex = 11
+SidebarFrame.Parent = MainWindow
+
+local SidebarDivider = Instance.new("Frame")
+SidebarDivider.Position = UDim2.new(1, -1, 0, 0)
+SidebarDivider.Size = UDim2.new(0, 1, 1, 0)
+SidebarDivider.BackgroundColor3 = Color3.fromRGB(48, 52, 62)
+SidebarDivider.BackgroundTransparency = 0.45
+SidebarDivider.BorderSizePixel = 0
+SidebarDivider.ZIndex = 12
+SidebarDivider.Parent = SidebarFrame
+
+local SearchContainer = Instance.new("Frame")
+SearchContainer.Position = UDim2.new(0, 10, 0, 10)
+SearchContainer.Size = UDim2.new(1, -20, 0, 30)
+SearchContainer.BackgroundColor3 = Color3.fromRGB(30, 32, 38)
+SearchContainer.BackgroundTransparency = 0.25
+SearchContainer.ZIndex = 12
+SearchContainer.Parent = SidebarFrame
+
+local SearchCorner = Instance.new("UICorner")
+SearchCorner.CornerRadius = UDim.new(0, 7)
+SearchCorner.Parent = SearchContainer
+
+local SearchStroke = Instance.new("UIStroke")
+SearchStroke.Color = Color3.fromRGB(58, 62, 72)
+SearchStroke.Thickness = 1
+SearchStroke.Transparency = 0.35
+SearchStroke.Parent = SearchContainer
+
+local SearchIcon = Instance.new("ImageLabel")
+SearchIcon.AnchorPoint = Vector2.new(0, 0.5)
+SearchIcon.Position = UDim2.new(0, 8, 0.5, 0)
+SearchIcon.Size = UDim2.fromOffset(13, 13)
+SearchIcon.BackgroundTransparency = 1
+SearchIcon.Image = LucideIcons.Search
+SearchIcon.ImageColor3 = Theme.TextSecondary
+SearchIcon.ZIndex = 13
+SearchIcon.Parent = SearchContainer
+
+local SearchTextBox = Instance.new("TextBox")
+SearchTextBox.Position = UDim2.new(0, 26, 0, 0)
+SearchTextBox.Size = UDim2.new(1, -30, 1, 0)
+SearchTextBox.BackgroundTransparency = 1
+SearchTextBox.Font = Enum.Font.Gotham
+SearchTextBox.PlaceholderText = "Search"
+SearchTextBox.PlaceholderColor3 = Theme.TextSecondary
+SearchTextBox.Text = ""
+SearchTextBox.TextColor3 = Theme.TextPrimary
+SearchTextBox.TextSize = 12
+SearchTextBox.TextXAlignment = Enum.TextXAlignment.Left
+SearchTextBox.ClearTextOnFocus = false
+SearchTextBox.ZIndex = 13
+SearchTextBox.Parent = SearchContainer
+
+local NavScroll = Instance.new("ScrollingFrame")
+NavScroll.Position = UDim2.new(0, 8, 0, 48)
+NavScroll.Size = UDim2.new(1, -16, 1, -54)
+NavScroll.BackgroundTransparency = 1
+NavScroll.BorderSizePixel = 0
+NavScroll.ScrollBarThickness = 2
+NavScroll.ScrollBarImageColor3 = Color3.fromRGB(80, 85, 98)
+NavScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+NavScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+NavScroll.ZIndex = 12
+NavScroll.Parent = SidebarFrame
+
+local NavListLayout = Instance.new("UIListLayout")
+NavListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+NavListLayout.Padding = UDim.new(0, 3)
+NavListLayout.Parent = NavScroll
+
+local ContentContainer = Instance.new("Frame")
+ContentContainer.Name = "ContentArea"
+ContentContainer.Position = UDim2.new(0, 155, 0, 44)
+ContentContainer.Size = UDim2.new(1, -155, 1, -44)
+ContentContainer.BackgroundTransparency = 1
+ContentContainer.ZIndex = 11
+ContentContainer.Parent = MainWindow
+
+-- Object-Oriented Tab & Component Builder
+local TabsRegistry = {}
+local AllSearchableCards = {}
+
+local function SelectTab(tabName)
+    for name, tabData in pairs(TabsRegistry) do
+        local isSelected = (name == tabName)
+        tabData.Page.Visible = isSelected
+        TweenService:Create(tabData.Button, TweenInfo.new(0.15), {
+            BackgroundTransparency = isSelected and Theme.TabActiveTrans or 1
+        }):Play()
+        tabData.TitleLabel.TextColor3 = isSelected and Theme.TextPrimary or Theme.TextSecondary
+        tabData.IconLabel.ImageColor3 = isSelected and Theme.TextPrimary or Theme.TextSecondary
+    end
+end
+
+local navOrderCounter = 0
+local function CreateCategoryGroup(groupTitle)
+    navOrderCounter += 1
+    local groupHeader = Instance.new("TextButton")
+    groupHeader.Name = groupTitle .. "_Category"
+    groupHeader.LayoutOrder = navOrderCounter
+    groupHeader.Size = UDim2.new(1, 0, 0, 24)
+    groupHeader.BackgroundTransparency = 1
+    groupHeader.Text = ""
+    groupHeader.ZIndex = 13
+    groupHeader.Parent = NavScroll
+
+    local label = Instance.new("TextLabel")
+    label.Position = UDim2.new(0, 4, 0, 0)
+    label.Size = UDim2.new(1, -24, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Font = Enum.Font.GothamMedium
+    label.Text = groupTitle .. ":"
+    label.TextColor3 = Theme.TextSecondary
+    label.TextSize = 11
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.ZIndex = 13
+    label.Parent = groupHeader
+
+    local chevron = Instance.new("ImageLabel")
+    chevron.AnchorPoint = Vector2.new(1, 0.5)
+    chevron.Position = UDim2.new(1, -4, 0.5, 0)
+    chevron.Size = UDim2.fromOffset(12, 12)
+    chevron.BackgroundTransparency = 1
+    chevron.Image = LucideIcons.ChevronUp
+    chevron.ImageColor3 = Theme.TextSecondary
+    chevron.ZIndex = 13
+    chevron.Parent = groupHeader
+
+    local groupTabs = {}
+    local expanded = true
+    groupHeader.MouseButton1Click:Connect(function()
+        expanded = not expanded
+        chevron.Image = expanded and LucideIcons.ChevronUp or LucideIcons.ChevronDown
+        for _, tBtn in ipairs(groupTabs) do
+            tBtn.Visible = expanded
+        end
+    end)
+
+    return groupTabs
+end
+
+local function CreateTab(tabName, iconId, groupList)
+    navOrderCounter += 1
+    local tabBtn = Instance.new("TextButton")
+    tabBtn.Name = tabName .. "_TabBtn"
+    tabBtn.LayoutOrder = navOrderCounter
+    tabBtn.Size = UDim2.new(1, 0, 0, 32)
+    tabBtn.BackgroundColor3 = Theme.TabActiveBg
+    tabBtn.BackgroundTransparency = 1
+    tabBtn.AutoButtonColor = false
+    tabBtn.Text = ""
+    tabBtn.ZIndex = 13
+    tabBtn.Parent = NavScroll
+
+    local tabCorner = Instance.new("UICorner")
+    tabCorner.CornerRadius = UDim.new(0, 7)
+    tabCorner.Parent = tabBtn
+
+    local tabIcon = Instance.new("ImageLabel")
+    tabIcon.AnchorPoint = Vector2.new(0, 0.5)
+    tabIcon.Position = UDim2.new(0, 10, 0.5, 0)
+    tabIcon.Size = UDim2.fromOffset(14, 14)
+    tabIcon.BackgroundTransparency = 1
+    tabIcon.Image = iconId
+    tabIcon.ImageColor3 = Theme.TextSecondary
+    tabIcon.ZIndex = 14
+    tabIcon.Parent = tabBtn
+
+    local tabTitle = Instance.new("TextLabel")
+    tabTitle.Position = UDim2.new(0, 32, 0, 0)
+    tabTitle.Size = UDim2.new(1, -36, 1, 0)
+    tabTitle.BackgroundTransparency = 1
+    tabTitle.Font = Enum.Font.GothamMedium
+    tabTitle.Text = tabName
+    tabTitle.TextColor3 = Theme.TextSecondary
+    tabTitle.TextSize = 12
+    tabTitle.TextXAlignment = Enum.TextXAlignment.Left
+    tabTitle.ZIndex = 14
+    tabTitle.Parent = tabBtn
+
+    if groupList then
+        table.insert(groupList, tabBtn)
+    end
+
+    local page = Instance.new("ScrollingFrame")
+    page.Name = tabName .. "_Page"
+    page.Size = UDim2.fromScale(1, 1)
+    page.BackgroundTransparency = 1
+    page.BorderSizePixel = 0
+    page.ScrollBarThickness = 3
+    page.ScrollBarImageColor3 = Color3.fromRGB(90, 95, 110)
+    page.CanvasSize = UDim2.new(0, 0, 0, 0)
+    page.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    page.Visible = false
+    page.ZIndex = 12
+    page.Parent = ContentContainer
+
+    local pagePadding = Instance.new("UIPadding")
+    pagePadding.PaddingTop = UDim.new(0, 10)
+    pagePadding.PaddingBottom = UDim.new(0, 14)
+    pagePadding.PaddingLeft = UDim.new(0, 12)
+    pagePadding.PaddingRight = UDim.new(0, 12)
+    pagePadding.Parent = page
+
+    local pageLayout = Instance.new("UIListLayout")
+    pageLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    pageLayout.Padding = UDim.new(0, 8)
+    pageLayout.Parent = page
+
+    local pageOrder = 0
+    local TabObject = {
+        Button = tabBtn,
+        TitleLabel = tabTitle,
+        IconLabel = tabIcon,
+        Page = page
+    }
+
+    function TabObject:AddSection(sectionTitle, iconAsset)
+        pageOrder += 1
+        local secFrame = Instance.new("Frame")
+        secFrame.Name = sectionTitle .. "_Section"
+        secFrame.LayoutOrder = pageOrder
+        secFrame.Size = UDim2.new(1, 0, 0, 24)
+        secFrame.BackgroundTransparency = 1
+        secFrame.ZIndex = 13
+        secFrame.Parent = page
+
+        local secIcon = Instance.new("ImageLabel")
+        secIcon.AnchorPoint = Vector2.new(0, 0.5)
+        secIcon.Position = UDim2.new(0, 2, 0.5, 0)
+        secIcon.Size = UDim2.fromOffset(14, 14)
+        secIcon.BackgroundTransparency = 1
+        secIcon.Image = iconAsset or LucideIcons.Haki
+        secIcon.ImageColor3 = Theme.TextPrimary
+        secIcon.ZIndex = 13
+        secIcon.Parent = secFrame
+
+        local secLabel = Instance.new("TextLabel")
+        secLabel.Position = UDim2.new(0, 22, 0, 0)
+        secLabel.Size = UDim2.new(1, -24, 1, 0)
+        secLabel.BackgroundTransparency = 1
+        secLabel.Font = Enum.Font.GothamBold
+        secLabel.Text = sectionTitle
+        secLabel.TextColor3 = Theme.TextPrimary
+        secLabel.TextSize = 12
+        secLabel.TextXAlignment = Enum.TextXAlignment.Left
+        secLabel.ZIndex = 13
+        secLabel.Parent = secFrame
+    end
+
+    function TabObject:AddToggle(titleText, subtitleText, defaultValue, callback)
+        pageOrder += 1
+        local card = Instance.new("TextButton")
+        card.Name = titleText .. "_ToggleCard"
+        card.LayoutOrder = pageOrder
+        card.Size = UDim2.new(1, 0, 0, 56)
+        card.BackgroundColor3 = Theme.CardBg
+        card.BackgroundTransparency = Theme.CardTrans
+        card.AutoButtonColor = false
+        card.Text = ""
+        card.ZIndex = 13
+        card.Parent = page
+
+        local cardCorner = Instance.new("UICorner")
+        cardCorner.CornerRadius = UDim.new(0, 8)
+        cardCorner.Parent = card
+
+        local titleLbl = Instance.new("TextLabel")
+        titleLbl.Position = UDim2.new(0, 14, 0, 10)
+        titleLbl.Size = UDim2.new(1, -60, 0, 18)
+        titleLbl.BackgroundTransparency = 1
+        titleLbl.Font = Enum.Font.GothamBold
+        titleLbl.Text = titleText
+        titleLbl.TextColor3 = Theme.TextPrimary
+        titleLbl.TextSize = 13
+        titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+        titleLbl.ZIndex = 14
+        titleLbl.Parent = card
+
+        local subLbl = Instance.new("TextLabel")
+        subLbl.Position = UDim2.new(0, 14, 0, 28)
+        subLbl.Size = UDim2.new(1, -60, 0, 20)
+        subLbl.BackgroundTransparency = 1
+        subLbl.Font = Enum.Font.Gotham
+        subLbl.Text = subtitleText
+        subLbl.TextColor3 = Theme.TextSecondary
+        subLbl.TextSize = 11
+        subLbl.TextWrapped = true
+        subLbl.TextXAlignment = Enum.TextXAlignment.Left
+        subLbl.ZIndex = 14
+        subLbl.Parent = card
+
+        local checkBox = Instance.new("Frame")
+        checkBox.AnchorPoint = Vector2.new(1, 0.5)
+        checkBox.Position = UDim2.new(1, -14, 0.5, 0)
+        checkBox.Size = UDim2.fromOffset(22, 22)
+        checkBox.BackgroundColor3 = defaultValue and Theme.CheckboxOn or Theme.CheckboxOff
+        checkBox.BackgroundTransparency = defaultValue and 0 or 0.25
+        checkBox.ZIndex = 14
+        checkBox.Parent = card
+
+        local checkCorner = Instance.new("UICorner")
+        checkCorner.CornerRadius = UDim.new(0, 6)
+        checkCorner.Parent = checkBox
+
+        local checkIcon = Instance.new("ImageLabel")
+        checkIcon.AnchorPoint = Vector2.new(0.5, 0.5)
+        checkIcon.Position = UDim2.fromScale(0.5, 0.5)
+        checkIcon.Size = UDim2.fromOffset(14, 14)
+        checkIcon.BackgroundTransparency = 1
+        checkIcon.Image = LucideIcons.Check
+        checkIcon.ImageColor3 = Color3.fromRGB(255, 255, 255)
+        checkIcon.ImageTransparency = defaultValue and 0 or 1
+        checkIcon.ZIndex = 15
+        checkIcon.Parent = checkBox
+
+        local state = defaultValue
+        local function SetState(newState, fireCallback)
+            state = newState
+            TweenService:Create(checkBox, TweenInfo.new(0.15), {
+                BackgroundColor3 = state and Theme.CheckboxOn or Theme.CheckboxOff,
+                BackgroundTransparency = state and 0 or 0.25
+            }):Play()
+            TweenService:Create(checkIcon, TweenInfo.new(0.15), {
+                ImageTransparency = state and 0 or 1
+            }):Play()
+            if fireCallback and callback then
+                task.spawn(callback, state)
+            end
+        end
+
+        card.MouseButton1Click:Connect(function()
+            SetState(not state, true)
+            SaveConfiguration()
+        end)
+
+        table.insert(AllSearchableCards, {
+            Card = card,
+            Query = string.lower(titleText .. " " .. subtitleText)
+        })
+
+        return { Set = SetState }
+    end
+
+    function TabObject:AddSlider(titleText, subtitleText, minVal, maxVal, defaultVal, callback)
+        pageOrder += 1
+        local card = Instance.new("Frame")
+        card.Name = titleText .. "_SliderCard"
+        card.LayoutOrder = pageOrder
+        card.Size = UDim2.new(1, 0, 0, 56)
+        card.BackgroundColor3 = Theme.CardBg
+        card.BackgroundTransparency = Theme.CardTrans
+        card.ZIndex = 13
+        card.Parent = page
+
+        local cardCorner = Instance.new("UICorner")
+        cardCorner.CornerRadius = UDim.new(0, 8)
+        cardCorner.Parent = card
+
+        local titleLbl = Instance.new("TextLabel")
+        titleLbl.Position = UDim2.new(0, 14, 0, 10)
+        titleLbl.Size = UDim2.new(1, -170, 0, 18)
+        titleLbl.BackgroundTransparency = 1
+        titleLbl.Font = Enum.Font.GothamBold
+        titleLbl.Text = titleText
+        titleLbl.TextColor3 = Theme.TextPrimary
+        titleLbl.TextSize = 13
+        titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+        titleLbl.ZIndex = 14
+        titleLbl.Parent = card
+
+        local subLbl = Instance.new("TextLabel")
+        subLbl.Position = UDim2.new(0, 14, 0, 28)
+        subLbl.Size = UDim2.new(1, -170, 0, 20)
+        subLbl.BackgroundTransparency = 1
+        subLbl.Font = Enum.Font.Gotham
+        subLbl.Text = subtitleText
+        subLbl.TextColor3 = Theme.TextSecondary
+        subLbl.TextSize = 11
+        subLbl.TextWrapped = true
+        subLbl.TextXAlignment = Enum.TextXAlignment.Left
+        subLbl.ZIndex = 14
+        subLbl.Parent = card
+
+        local valLbl = Instance.new("TextLabel")
+        valLbl.AnchorPoint = Vector2.new(1, 0.5)
+        valLbl.Position = UDim2.new(1, -108, 0.5, 0)
+        valLbl.Size = UDim2.fromOffset(36, 18)
+        valLbl.BackgroundTransparency = 1
+        valLbl.Font = Enum.Font.GothamMedium
+        valLbl.Text = tostring(defaultVal)
+        valLbl.TextColor3 = Theme.TextSecondary
+        valLbl.TextSize = 11
+        valLbl.TextXAlignment = Enum.TextXAlignment.Right
+        valLbl.ZIndex = 14
+        valLbl.Parent = card
+
+        local track = Instance.new("Frame")
+        track.AnchorPoint = Vector2.new(1, 0.5)
+        track.Position = UDim2.new(1, -14, 0.5, 0)
+        track.Size = UDim2.fromOffset(86, 4)
+        track.BackgroundColor3 = Theme.SliderTrack
+        track.ZIndex = 14
+        track.Parent = card
+
+        local trackCorner = Instance.new("UICorner")
+        trackCorner.CornerRadius = UDim.new(1, 0)
+        trackCorner.Parent = track
+
+        local initAlpha = math.clamp((defaultVal - minVal) / (maxVal - minVal), 0, 1)
+
+        local fill = Instance.new("Frame")
+        fill.Size = UDim2.new(initAlpha, 0, 1, 0)
+        fill.BackgroundColor3 = Theme.SliderFill
+        fill.ZIndex = 15
+        fill.Parent = track
+
+        local fillCorner = Instance.new("UICorner")
+        fillCorner.CornerRadius = UDim.new(1, 0)
+        fillCorner.Parent = fill
+
+        local thumb = Instance.new("Frame")
+        thumb.AnchorPoint = Vector2.new(0.5, 0.5)
+        thumb.Position = UDim2.new(initAlpha, 0, 0.5, 0)
+        thumb.Size = UDim2.fromOffset(13, 13)
+        thumb.BackgroundColor3 = Theme.SliderThumb
+        thumb.ZIndex = 16
+        thumb.Parent = track
+
+        local thumbCorner = Instance.new("UICorner")
+        thumbCorner.CornerRadius = UDim.new(1, 0)
+        thumbCorner.Parent = thumb
+
+        local sDragging = false
+        local function UpdateFromInput(inputPos)
+            local relX = math.clamp((inputPos.X - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
+            local computed = math.floor(minVal + (maxVal - minVal) * relX + 0.5)
+            local snappedAlpha = (computed - minVal) / (maxVal - minVal)
+            fill.Size = UDim2.new(snappedAlpha, 0, 1, 0)
+            thumb.Position = UDim2.new(snappedAlpha, 0, 0.5, 0)
+            valLbl.Text = tostring(computed)
+            if callback then
+                task.spawn(callback, computed)
+            end
+        end
+
+        track.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                sDragging = true
+                UpdateFromInput(input.Position)
+            end
+        end)
+        thumb.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                sDragging = true
+                UpdateFromInput(input.Position)
+            end
+        end)
+        UserInputService.InputChanged:Connect(function(input)
+            if sDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                UpdateFromInput(input.Position)
+            end
+        end)
+        UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                if sDragging then SaveConfiguration() end
+                sDragging = false
+            end
+        end)
+
+        table.insert(AllSearchableCards, {
+            Card = card,
+            Query = string.lower(titleText .. " " .. subtitleText)
+        })
+    end
+
+    function TabObject:AddDropdown(titleText, subtitleText, optionsList, defaultOpt, callback)
+        pageOrder += 1
+        local card = Instance.new("Frame")
+        card.Name = titleText .. "_DropdownCard"
+        card.LayoutOrder = pageOrder
+        card.Size = UDim2.new(1, 0, 0, 56)
+        card.BackgroundColor3 = Theme.CardBg
+        card.BackgroundTransparency = Theme.CardTrans
+        card.ZIndex = 13
+        card.Parent = page
+
+        local cardCorner = Instance.new("UICorner")
+        cardCorner.CornerRadius = UDim.new(0, 8)
+        cardCorner.Parent = card
+
+        local titleLbl = Instance.new("TextLabel")
+        titleLbl.Position = UDim2.new(0, 14, 0, 10)
+        titleLbl.Size = UDim2.new(1, -145, 0, 18)
+        titleLbl.BackgroundTransparency = 1
+        titleLbl.Font = Enum.Font.GothamBold
+        titleLbl.Text = titleText
+        titleLbl.TextColor3 = Theme.TextPrimary
+        titleLbl.TextSize = 13
+        titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+        titleLbl.ZIndex = 14
+        titleLbl.Parent = card
+
+        local subLbl = Instance.new("TextLabel")
+        subLbl.Position = UDim2.new(0, 14, 0, 28)
+        subLbl.Size = UDim2.new(1, -145, 0, 20)
+        subLbl.BackgroundTransparency = 1
+        subLbl.Font = Enum.Font.Gotham
+        subLbl.Text = subtitleText
+        subLbl.TextColor3 = Theme.TextSecondary
+        subLbl.TextSize = 11
+        subLbl.TextWrapped = true
+        subLbl.TextXAlignment = Enum.TextXAlignment.Left
+        subLbl.ZIndex = 14
+        subLbl.Parent = card
+
+        local dropBtn = Instance.new("TextButton")
+        dropBtn.AnchorPoint = Vector2.new(1, 0.5)
+        dropBtn.Position = UDim2.new(1, -14, 0.5, 0)
+        dropBtn.Size = UDim2.fromOffset(108, 28)
+        dropBtn.BackgroundColor3 = Color3.fromRGB(44, 47, 56)
+        dropBtn.BackgroundTransparency = 0.2
+        dropBtn.AutoButtonColor = true
+        dropBtn.Text = ""
+        dropBtn.ZIndex = 14
+        dropBtn.Parent = card
+
+        local dropCorner = Instance.new("UICorner")
+        dropCorner.CornerRadius = UDim.new(0, 6)
+        dropCorner.Parent = dropBtn
+
+        local dropValLabel = Instance.new("TextLabel")
+        dropValLabel.Position = UDim2.new(0, 10, 0, 0)
+        dropValLabel.Size = UDim2.new(1, -28, 1, 0)
+        dropValLabel.BackgroundTransparency = 1
+        dropValLabel.Font = Enum.Font.GothamMedium
+        dropValLabel.Text = defaultOpt or optionsList[1]
+        dropValLabel.TextColor3 = Theme.TextPrimary
+        dropValLabel.TextSize = 11
+        dropValLabel.TextXAlignment = Enum.TextXAlignment.Left
+        dropValLabel.ZIndex = 15
+        dropValLabel.Parent = dropBtn
+
+        local dropIcon = Instance.new("ImageLabel")
+        dropIcon.AnchorPoint = Vector2.new(1, 0.5)
+        dropIcon.Position = UDim2.new(1, -7, 0.5, 0)
+        dropIcon.Size = UDim2.fromOffset(12, 12)
+        dropIcon.BackgroundTransparency = 1
+        dropIcon.Image = LucideIcons.ChevronsUpDown
+        dropIcon.ImageColor3 = Theme.TextSecondary
+        dropIcon.ZIndex = 15
+        dropIcon.Parent = dropBtn
+
+        local currentIdx = table.find(optionsList, defaultOpt) or 1
+        dropBtn.MouseButton1Click:Connect(function()
+            currentIdx = (currentIdx % #optionsList) + 1
+            local chosen = optionsList[currentIdx]
+            dropValLabel.Text = chosen
+            if callback then
+                task.spawn(callback, chosen)
+            end
+            SaveConfiguration()
+        end)
+
+        table.insert(AllSearchableCards, {
+            Card = card,
+            Query = string.lower(titleText .. " " .. subtitleText)
+        })
+    end
+
+    function TabObject:AddButton(titleText, subtitleText, badgeText, callback)
+        pageOrder += 1
+        local card = Instance.new("TextButton")
+        card.Name = titleText .. "_ActionCard"
+        card.LayoutOrder = pageOrder
+        card.Size = UDim2.new(1, 0, 0, 52)
+        card.BackgroundColor3 = Theme.CardBg
+        card.BackgroundTransparency = Theme.CardTrans
+        card.AutoButtonColor = true
+        card.Text = ""
+        card.ZIndex = 13
+        card.Parent = page
+
+        local cardCorner = Instance.new("UICorner")
+        cardCorner.CornerRadius = UDim.new(0, 8)
+        cardCorner.Parent = card
+
+        local titleLbl = Instance.new("TextLabel")
+        titleLbl.Position = UDim2.new(0, 14, 0, 8)
+        titleLbl.Size = UDim2.new(1, -90, 0, 18)
+        titleLbl.BackgroundTransparency = 1
+        titleLbl.Font = Enum.Font.GothamBold
+        titleLbl.Text = titleText
+        titleLbl.TextColor3 = Theme.TextPrimary
+        titleLbl.TextSize = 13
+        titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+        titleLbl.ZIndex = 14
+        titleLbl.Parent = card
+
+        local subLbl = Instance.new("TextLabel")
+        subLbl.Position = UDim2.new(0, 14, 0, 26)
+        subLbl.Size = UDim2.new(1, -90, 0, 18)
+        subLbl.BackgroundTransparency = 1
+        subLbl.Font = Enum.Font.Gotham
+        subLbl.Text = subtitleText
+        subLbl.TextColor3 = Theme.TextSecondary
+        subLbl.TextSize = 11
+        subLbl.TextXAlignment = Enum.TextXAlignment.Left
+        subLbl.ZIndex = 14
+        subLbl.Parent = card
+
+        local pill = Instance.new("Frame")
+        pill.AnchorPoint = Vector2.new(1, 0.5)
+        pill.Position = UDim2.new(1, -14, 0.5, 0)
+        pill.Size = UDim2.fromOffset(64, 24)
+        pill.BackgroundColor3 = Theme.CheckboxOn
+        pill.ZIndex = 14
+        pill.Parent = card
+
+        local pillCorner = Instance.new("UICorner")
+        pillCorner.CornerRadius = UDim.new(0, 6)
+        pillCorner.Parent = pill
+
+        local pillLbl = Instance.new("TextLabel")
+        pillLbl.Size = UDim2.fromScale(1, 1)
+        pillLbl.BackgroundTransparency = 1
+        pillLbl.Font = Enum.Font.GothamBold
+        pillLbl.Text = badgeText or "Run"
+        pillLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+        pillLbl.TextSize = 11
+        pillLbl.ZIndex = 15
+        pillLbl.Parent = pill
+
+        card.MouseButton1Click:Connect(function()
+            if callback then
+                task.spawn(callback)
+            end
+        end)
+
+        table.insert(AllSearchableCards, {
+            Card = card,
+            Query = string.lower(titleText .. " " .. subtitleText)
+        })
+    end
+
+    tabBtn.MouseButton1Click:Connect(function()
+        SelectTab(tabName)
+    end)
+
+    TabsRegistry[tabName] = TabObject
+    return TabObject
+end
+
+SearchTextBox:GetPropertyChangedSignal("Text"):Connect(function()
+    local q = string.lower(SearchTextBox.Text or "")
+    for _, item in ipairs(AllSearchableCards) do
+        if q == "" or string.find(item.Query, q, 1, true) then
+            item.Card.Visible = true
+        else
+            item.Card.Visible = false
+        end
+    end
+end)
+
+-- ========================================================================================
+-- [SECTION 8] POPULATING ALL 7 HERMANOS'DEV TABS (LEGIT & RAGE CATEGORIES)
+-- ========================================================================================
+local LegitGroup = CreateCategoryGroup("Legit")
+local GeneralTab = CreateTab("General", LucideIcons.General, LegitGroup)
+local CombatTab  = CreateTab("Combat",  LucideIcons.Combat,  LegitGroup)
+local ESPTab     = CreateTab("ESP",     LucideIcons.ESP,     LegitGroup)
+
+local RageGroup  = CreateCategoryGroup("Rage")
+local BountyTab  = CreateTab("Bounty Hunting", LucideIcons.BountyHunting, RageGroup)
+local SkillsTab  = CreateTab("Skills",         LucideIcons.Skills,        RageGroup)
+local KeyBindTab = CreateTab("Key Bind",       LucideIcons.KeyBind,       RageGroup)
+local MiscTab    = CreateTab("Misc",           LucideIcons.Misc,          RageGroup)
+
+-- ----------------------------------------------------------------------------------------
+-- [TAB 1: LEGIT -> GENERAL]
+-- ----------------------------------------------------------------------------------------
+GeneralTab:AddSection("Auto Haki:", LucideIcons.Haki)
+GeneralTab:AddToggle("Buso Haki", "Enable to activate Buso Haki", Config.BusoHaki, function(val)
+    Config.BusoHaki = val
+end)
+GeneralTab:AddToggle("Ken Haki", "Enable to activate Ken Haki", Config.KenHaki, function(val)
+    Config.KenHaki = val
+end)
+
+GeneralTab:AddSection("Ability:", LucideIcons.Ability)
+GeneralTab:AddToggle("Race V3", "Enable to activate Race V3", Config.RaceV3, function(val)
+    Config.RaceV3 = val
+end)
+GeneralTab:AddToggle("Race V4", "Enable to activate Race V4", Config.RaceV4, function(val)
+    Config.RaceV4 = val
+end)
+
+GeneralTab:AddToggle("Anti Stun", "Enable to activate Anti Stun", Config.AntiStun, function(val)
+    Config.AntiStun = val
+end)
+GeneralTab:AddSlider("Speed Multiply", "Multiply the speed of the player", 1, 50, Config.SpeedMultiply, function(val)
+    Config.SpeedMultiply = val
+end)
+GeneralTab:AddToggle("Speed Boost", "Enable to activate Speed Boost", Config.SpeedBoost, function(val)
+    Config.SpeedBoost = val
+end)
+GeneralTab:AddToggle("Jump Power", "Enable to activate Jump Power", Config.JumpPower, function(val)
+    Config.JumpPower = val
+    local hum = GetHumanoid(LocalPlayer)
+    if hum and not val then
+        hum.JumpPower = 50
+    end
+end)
+GeneralTab:AddSlider("Jump Power Value", "Customize JumpPower height value", 50, 250, Config.JumpPowerValue, function(val)
+    Config.JumpPowerValue = val
+end)
+GeneralTab:AddToggle("Walk On Water", "Enable to walk on water", Config.WalkOnWater, function(val)
+    Config.WalkOnWater = val
+    pcall(function()
+        local map = Workspace:FindFirstChild("Map")
+        local waterPlane = map and map:FindFirstChild("WaterBase-Plane")
+        if waterPlane then
+            waterPlane.Size = val and Vector3.new(1000, 112, 1000) or Vector3.new(1000, 80, 1000)
+        end
+    end)
+end)
+
+-- ----------------------------------------------------------------------------------------
+-- [TAB 2: LEGIT -> COMBAT][cite: 2, 10]
+-- ----------------------------------------------------------------------------------------
+CombatTab:AddSlider("FOV Size", "The size of the FOV circle", 50, 800, Config.FOVSize, function(val)
+    Config.FOVSize = val
+    FOVCircleFrame.Size = UDim2.fromOffset(val, val)
+end)
+CombatTab:AddDropdown("FOV Mode", "Choose FOV reference position", {"Middle", "Mouse", "Target"}, Config.FOVMode, function(val)
+    Config.FOVMode = val
+end)
+CombatTab:AddSlider("Aim Range", "The range of aimbot", 100, 1500, Config.AimRange, function(val)
+    Config.AimRange = val
+end)
+CombatTab:AddToggle("Silent Aim", "Redirect skill and weapon MousePos remotes to target", Config.SilentAim, function(val)
+    Config.SilentAim = val
+end)
+CombatTab:AddDropdown("Aim Target Part", "Body part targeted by Silent Aim & Camera Lock", {"HumanoidRootPart", "Head", "UpperTorso"}, Config.AimPart, function(val)
+    Config.AimPart = val
+end)
+
+CombatTab:AddSection("Soru:", LucideIcons.Soru)
+CombatTab:AddSlider("Soru Silent Range", "The range of Soru silent", 50, 600, Config.SoruSilentRange, function(val)
+    Config.SoruSilentRange = val
+end)
+CombatTab:AddToggle("Soru Silent", "Force Soru to target position", Config.SoruSilent, function(val)
+    Config.SoruSilent = val
+end)
+
+CombatTab:AddSection("Attack Aura:", LucideIcons.AttackAura)
+CombatTab:AddToggle("Attack Aura", "Attack aura to target player. (Melee, Sword, Fruit M1)", Config.AttackAura, function(val)
+    Config.AttackAura = val
+end)
+
+CombatTab:AddSection("Utility:", LucideIcons.Utility)
+CombatTab:AddSlider("Teleport Behide Target Range", "The range of teleport behide target", 50, 600, Config.TeleportBehideRange, function(val)
+    Config.TeleportBehideRange = val
+end)
+CombatTab:AddToggle("Teleport Behide Target", "Teleport behind the target", Config.TeleportBehideTarget, function(val)
+    Config.TeleportBehideTarget = val
+end)
+CombatTab:AddToggle("Auto Skills", "Auto use skills", Config.AutoSkills, function(val)
+    Config.AutoSkills = val
+end)
+
+CombatTab:AddSection("Visualize:", LucideIcons.Visualize)
+CombatTab:AddToggle("Draw Red Line", "Draw the red line around the target", Config.DrawRedLine, function(val)
+    Config.DrawRedLine = val
+end)
+CombatTab:AddToggle("Draw Sphere", "Draw the sphere around the target", Config.DrawSphere, function(val)
+    Config.DrawSphere = val
+end)
+
+-- ----------------------------------------------------------------------------------------
+-- [TAB 3: LEGIT -> ESP][cite: 2]
+-- ----------------------------------------------------------------------------------------
+ESPTab:AddToggle("Name", "Show the name of the player", Config.ESP_Name, function(val)
+    Config.ESP_Name = val
+end)
+ESPTab:AddToggle("Health", "Show the health of the player", Config.ESP_Health, function(val)
+    Config.ESP_Health = val
+end)
+ESPTab:AddToggle("Distance", "Show the distance of the player", Config.ESP_Distance, function(val)
+    Config.ESP_Distance = val
+end)
+ESPTab:AddToggle("Team", "Show the team of the player", Config.ESP_Team, function(val)
+    Config.ESP_Team = val
+end)
+ESPTab:AddToggle("Level", "Show the level of the player", Config.ESP_Level, function(val)
+    Config.ESP_Level = val
+end)
+ESPTab:AddToggle("Bounty", "Show the bounty of the player", Config.ESP_Bounty, function(val)
+    Config.ESP_Bounty = val
+end)
+ESPTab:AddToggle("Ken Active", "Show the ken active of the player", Config.ESP_KenActive, function(val)
+    Config.ESP_KenActive = val
+end)
+ESPTab:AddToggle("Pvp State", "Show pvp status InCombat, Disable Pvp, Ready Pvp", Config.ESP_PvpState, function(val)
+    Config.ESP_PvpState = val
+end)
+
+-- ----------------------------------------------------------------------------------------
+-- [TAB 4: RAGE -> BOUNTY HUNTING]
+-- ----------------------------------------------------------------------------------------
+BountyTab:AddSection("Auto Bounty Engine:", LucideIcons.BountyHunting)
+BountyTab:AddToggle("Auto Bounty Hunt", "Automatically hunt targets, execute combos, and cycle server", Config.AutoBounty, function(val)
+    Config.AutoBounty = val
+    State.TargetHuntStartTick = os.clock()
+    Notify("Bounty Hunting", val and "Auto Bounty Engine Started" or "Auto Bounty Engine Stopped", 2.5)
+end)
+BountyTab:AddSlider("Safe Health Retreat", "Teleport to high altitude safe zone when HP drops below value", 1500, 10000, Config.SafeHealth, function(val)
+    Config.SafeHealth = val
+end)
+BountyTab:AddSlider("Recover Health Threshold", "Resume hunting when HP recovers above value", 3000, 13000, Config.RecoverHealth, function(val)
+    Config.RecoverHealth = val
+end)
+BountyTab:AddToggle("Portal Bypass TP", "Use Sea 3 / Sea 2 / Sea 1 portal entrances for instant travel", Config.BypassTP, function(val)
+    Config.BypassTP = val
+end)
+BountyTab:AddToggle("Skip Race V4 Users", "Automatically skip players with active Race V4 Awakening", Config.SkipRaceV4, function(val)
+    Config.SkipRaceV4 = val
+end)
+BountyTab:AddButton("Skip Current Target", "Blacklist current target and switch to next player", "Skip", function()
+    local cur = State.LockedTarget or State.CurrentTarget
+    if cur then
+        State.BlacklistedTargets[cur.UserId] = true
+        Notify("Bounty Hunting", "Skipped target: " .. cur.Name, 2)
+        State.LockedTarget = nil
+        State.CurrentTarget = nil
+        State.TargetHuntStartTick = os.clock()
+    end
+end)
+BountyTab:AddButton("Clear Target Blacklist", "Reset skipped player list for current server", "Clear", function()
+    State.BlacklistedTargets = {}
+    Notify("Bounty Hunting", "Target blacklist cleared", 2)
+end)
+BountyTab:AddToggle("Auto Server Hop", "Hop to a new server when all valid bounty targets are cleared", Config.AutoServerHop, function(val)
+    Config.AutoServerHop = val
+end)
+
+-- ----------------------------------------------------------------------------------------
+-- [TAB 5: RAGE -> SKILLS]
+-- ----------------------------------------------------------------------------------------
+SkillsTab:AddSection("Melee Combo Configuration:", LucideIcons.Skills)
+SkillsTab:AddToggle("Use Melee Skills", "Equip and fire Fighting Style skills (Z, X, C)", Config.UseMelee, function(val)
+    Config.UseMelee = val
+end)
+SkillsTab:AddSlider("Melee Z Hold (x0.1s)", "Hold duration for Melee Z skill", 0, 25, math.floor(Config.MeleeHoldZ * 10), function(val)
+    Config.MeleeHoldZ = val / 10
+end)
+SkillsTab:AddSlider("Melee X Hold (x0.1s)", "Hold duration for Melee X skill", 0, 25, math.floor(Config.MeleeHoldX * 10), function(val)
+    Config.MeleeHoldX = val / 10
+end)
+SkillsTab:AddSlider("Melee C Hold (x0.1s)", "Hold duration for Melee C skill", 0, 25, math.floor(Config.MeleeHoldC * 10), function(val)
+    Config.MeleeHoldC = val / 10
+end)
+
+SkillsTab:AddSection("Sword Combo Configuration:", LucideIcons.Sword)
+SkillsTab:AddToggle("Use Sword Skills", "Equip and fire Sword skills (Z, X)", Config.UseSword, function(val)
+    Config.UseSword = val
+end)
+SkillsTab:AddSlider("Sword Z Hold (x0.1s)", "Hold duration for Sword Z skill", 0, 25, math.floor(Config.SwordHoldZ * 10), function(val)
+    Config.SwordHoldZ = val / 10
+end)
+SkillsTab:AddSlider("Sword X Hold (x0.1s)", "Hold duration for Sword X skill", 0, 25, math.floor(Config.SwordHoldX * 10), function(val)
+    Config.SwordHoldX = val / 10
+end)
+
+SkillsTab:AddSection("Blox Fruit & Gun Skills:", LucideIcons.Flame)
+SkillsTab:AddToggle("Use Blox Fruit Skills", "Equip and fire Blox Fruit skills (Z, X, C, V)", Config.UseFruit, function(val)
+    Config.UseFruit = val
+end)
+SkillsTab:AddSlider("Fruit Z Hold (x0.1s)", "Hold duration for Blox Fruit Z skill", 0, 25, math.floor(Config.FruitHoldZ * 10), function(val)
+    Config.FruitHoldZ = val / 10
+end)
+SkillsTab:AddToggle("Use Gun Skills", "Equip and fire Gun skills (Z, X)", Config.UseGun, function(val)
+    Config.UseGun = val
+end)
+
+-- ----------------------------------------------------------------------------------------
+-- [TAB 6: RAGE -> KEY BIND][cite: 7]
+-- ----------------------------------------------------------------------------------------
+KeyBindTab:AddSection("Keyboard Shortcuts:", LucideIcons.KeyBind)
+KeyBindTab:AddDropdown("Toggle UI Keybind", "Keybind to show or hide Hermanos'Dev Hub", {"RightControl", "LeftControl", "RightShift", "Insert"}, Config.Key_ToggleUI.Name, function(val)
+    Config.Key_ToggleUI = Enum.KeyCode[val] or Enum.KeyCode.RightControl
+end)
+KeyBindTab:AddDropdown("Camera Lock Keybind", "Keybind to toggle Camera Lock onto nearest target", {"Q", "C", "E", "V"}, Config.Key_CameraLock.Name, function(val)
+    Config.Key_CameraLock = Enum.KeyCode[val] or Enum.KeyCode.Q
+end)
+KeyBindTab:AddDropdown("TP To Target Keybind", "Keybind to teleport behind locked target", {"T", "Y", "B", "H"}, Config.Key_TPToTarget.Name, function(val)
+    Config.Key_TPToTarget = Enum.KeyCode[val] or Enum.KeyCode.T
+end)
+KeyBindTab:AddDropdown("Skip Target Keybind", "Keybind to blacklist and skip current target", {"G", "N", "M", "J"}, Config.Key_SkipTarget.Name, function(val)
+    Config.Key_SkipTarget = Enum.KeyCode[val] or Enum.KeyCode.G
+end)
+
+-- ----------------------------------------------------------------------------------------
+-- [TAB 7: RAGE -> MISC][cite: 2]
+-- ----------------------------------------------------------------------------------------
+MiscTab:AddSection("Character & World Utilities:", LucideIcons.Misc)
+MiscTab:AddToggle("Show Target HUD Panel", "Display top-center target health bar when locked onto a player", Config.ShowTargetHUD, function(val)
+    Config.ShowTargetHUD = val
+end)
+MiscTab:AddToggle("Invisible Function (Plus+)", "Desynchronize root pitch angle for PvP stealth", Config.InvisiblePlus, function(val)
+    Config.InvisiblePlus = val
+end)
+MiscTab:AddToggle("Infinite Geppo & Soru", "Patch Flash Step and Skyjump cooldown tables in GC", Config.InfiniteGeppo, function(val)
+    Config.InfiniteGeppo = val
+end)
+MiscTab:AddToggle("Infinite Energy", "Freeze local character Energy value during combat", Config.InfiniteEnergy, function(val)
+    Config.InfiniteEnergy = val
+end)
+MiscTab:AddToggle("White Screen Mode", "Disable 3D viewport rendering to save GPU during AFK farm", Config.WhiteScreen, function(val)
+    Config.WhiteScreen = val
+    WhiteScreenFrame.Visible = val
+    pcall(function() RunService:Set3dRenderingEnabled(not val) end)
+end)
+MiscTab:AddToggle("FPS Boost / Low GFX", "Strip particles, trails, and shadows for peak PvP frame rate", Config.FPSBoost, function(val)
+    Config.FPSBoost = val
+    if val then
+        pcall(function()
+            settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+            Lighting.GlobalShadows = false
+            Lighting.FogEnd = 9e9
+            for _, v in ipairs(Workspace:GetDescendants()) do
+                if v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Smoke") or v:IsA("Fire") or v:IsA("Sparkles") then
+                    v.Enabled = false
+                elseif v:IsA("BasePart") then
+                    v.Material = Enum.Material.SmoothPlastic
+                    v.Reflectance = 0
+                end
+            end
+        end)
+    end
+end)
+MiscTab:AddButton("Join Pirates Team", "Invoke CommF_ SetTeam Pirates", "Pirates", function()
+    if CommF_ then pcall(function() CommF_:InvokeServer("SetTeam", "Pirates") end) end
+end)
+MiscTab:AddButton("Join Marines Team", "Invoke CommF_ SetTeam Marines", "Marines", function()
+    if CommF_ then pcall(function() CommF_:InvokeServer("SetTeam", "Marines") end) end
+end)
+MiscTab:AddButton("Server Hop", "Find and join a new public Blox Fruits server", "Hop", function()
+    Notify("Server Hop", "Searching for available Blox Fruits server...", 3)
+    pcall(function()
+        local servers = HttpService:JSONDecode(game:HttpGet(
+            "https://games.roblox.com/v1/games/" .. tostring(PlaceId) .. "/servers/Public?sortOrder=Asc&limit=100"
+        ))
+        if servers and servers.data then
+            for _, srv in ipairs(servers.data) do
+                if srv.playing < (srv.maxPlayers - 2) and srv.id ~= game.JobId then
+                    TeleportService:TeleportToPlaceInstance(PlaceId, srv.id, LocalPlayer)
+                    break
+                end
+            end
+        end
+    end)
+end)
+MiscTab:AddButton("Rejoin Current Server", "Reconnect to the current server instance", "Rejoin", function()
+    TeleportService:TeleportToPlaceInstance(PlaceId, game.JobId, LocalPlayer)
+end)
+
+SelectTab("General")
+
+-- ========================================================================================
+-- [SECTION 9] 3D TARGET VISUALIZERS ('Draw Sphere' & 'Draw Red Line')
+-- ========================================================================================
+local TargetSphereAdorn = Instance.new("SphereHandleAdornment")
+TargetSphereAdorn.Name = "HermanosTargetSphere"
+TargetSphereAdorn.Color3 = Theme.VisualRed
+TargetSphereAdorn.Transparency = 0.68
+TargetSphereAdorn.Radius = 6.5
+TargetSphereAdorn.AlwaysOnTop = true
+TargetSphereAdorn.ZIndex = 5
+TargetSphereAdorn.Visible = false
+TargetSphereAdorn.Parent = VisualsFolder
+
+local TargetRingAdorn = Instance.new("CylinderHandleAdornment")
+TargetRingAdorn.Name = "HermanosTargetRedRing"
+TargetRingAdorn.Color3 = Theme.VisualRed
+TargetRingAdorn.Transparency = 0.22
+TargetRingAdorn.InnerRadius = 7.2
+TargetRingAdorn.Radius = 7.8
+TargetRingAdorn.Height = 0.25
+TargetRingAdorn.CFrame = CFrame.Angles(math.rad(90), 0, 0)
+TargetRingAdorn.AlwaysOnTop = true
+TargetRingAdorn.ZIndex = 6
+TargetRingAdorn.Visible = false
+TargetRingAdorn.Parent = VisualsFolder
+
+local TargetLineAdorn = Instance.new("BoxHandleAdornment")
+TargetLineAdorn.Name = "HermanosTargetLine"
+TargetLineAdorn.Color3 = Theme.VisualRed
+TargetLineAdorn.Transparency = 0.18
+TargetLineAdorn.AlwaysOnTop = true
+TargetLineAdorn.ZIndex = 6
+TargetLineAdorn.Visible = false
+TargetLineAdorn.Parent = VisualsFolder
+
+local function UpdateTargetVisualizers(targetPlr)
+    local myHrp = GetRootPart(LocalPlayer)
+    local tHrp  = targetPlr and GetRootPart(targetPlr)
+    local tHum  = targetPlr and GetHumanoid(targetPlr)
+
+    if not myHrp or not tHrp or not tHum or tHum.Health <= 0 then
+        TargetSphereAdorn.Visible = false
+        TargetSphereAdorn.Adornee = nil
+        TargetRingAdorn.Visible = false
+        TargetRingAdorn.Adornee = nil
+        TargetLineAdorn.Visible = false
+        TargetLineAdorn.Adornee = nil
+        TargetHudFrame.Visible = false
+        return
+    end
+
+    if Config.ShowTargetHUD then
+        TargetHudFrame.Visible = true
+        local dist = math.floor((myHrp.Position - tHrp.Position).Magnitude)
+        TargetHudName.Text = string.format("%s [%dm]", targetPlr.DisplayName or targetPlr.Name, dist)
+        local hpRatio = math.clamp(tHum.Health / math.max(tHum.MaxHealth, 1), 0, 1)
+        TargetHudBarFill.Size = UDim2.fromScale(hpRatio, 1)
+        TargetHudHpText.Text = string.format("%d / %d (%d%%)", math.floor(tHum.Health), math.floor(tHum.MaxHealth), math.floor(hpRatio * 100))
+    else
+        TargetHudFrame.Visible = false
+    end
+
+    if Config.DrawSphere then
+        TargetSphereAdorn.Adornee = tHrp
+        TargetSphereAdorn.Visible = true
+    else
+        TargetSphereAdorn.Visible = false
+    end
+
+    if Config.DrawRedLine then
+        TargetRingAdorn.Adornee = tHrp
+        TargetRingAdorn.Visible = true
+
+        local dist = (myHrp.Position - tHrp.Position).Magnitude
+        TargetLineAdorn.Adornee = Workspace.Terrain
+        TargetLineAdorn.Size = Vector3.new(0.18, 0.18, dist)
+        TargetLineAdorn.CFrame = CFrame.lookAt(myHrp.Position, tHrp.Position) * CFrame.new(0, 0, -dist * 0.5)
+        TargetLineAdorn.Visible = true
+    else
+        TargetRingAdorn.Visible = false
+        TargetLineAdorn.Visible = false
+    end
+end
+
+-- ========================================================================================
+-- [SECTION 10] BLOX FRUITS 8-FIELD REAL-TIME PLAYER ESP ENGINE
+-- ========================================================================================
+-- Renders Name, Health, Distance, Team, Level, Bounty, Ken Active, and Pvp State[cite: 2]
+local function UpdateESP()
+    local anyEspActive = (
+        Config.ESP_Name or Config.ESP_Health or Config.ESP_Distance or
+        Config.ESP_Team or Config.ESP_Level or Config.ESP_Bounty or
+        Config.ESP_KenActive or Config.ESP_PvpState
+    )
+
+    if not anyEspActive then
+        for _, gui in pairs(State.ESPObjects) do
+            gui.Enabled = false
+        end
+        return
+    end
+
+    local myHrp = GetRootPart(LocalPlayer)
+
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer then
+            local char = GetCharacter(plr)
+            local head = char and char:FindFirstChild("Head")
+            local hum  = GetHumanoid(plr)
+            local hrp  = GetRootPart(plr)
+
+            if char and head and hum and hrp and hum.Health > 0 then
+                local bGui = State.ESPObjects[plr.UserId]
+                if not bGui then
+                    bGui = Instance.new("BillboardGui")
+                    bGui.Name = "HermanosESP_" .. tostring(plr.UserId)
+                    bGui.AlwaysOnTop = true
+                    bGui.Size = UDim2.fromOffset(230, 100)
+                    bGui.StudsOffset = Vector3.new(0, 3.6, 0)
+                    bGui.Parent = VisualsFolder
+
+                    local textLbl = Instance.new("TextLabel")
+                    textLbl.Name = "InfoLabel"
+                    textLbl.Size = UDim2.fromScale(1, 1)
+                    textLbl.BackgroundTransparency = 1
+                    textLbl.Font = Enum.Font.GothamBold
+                    textLbl.TextSize = 11
+                    textLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+                    textLbl.TextStrokeTransparency = 0.22
+                    textLbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+                    textLbl.RichText = true
+                    textLbl.Parent = bGui
+
+                    State.ESPObjects[plr.UserId] = bGui
+                end
+
+                bGui.Adornee = head
+                bGui.Enabled = true
+
+                local lines = {}
+                if Config.ESP_Name or Config.ESP_Level then
+                    local namePart = Config.ESP_Name and plr.Name or ""
+                    local dataFolder = plr:FindFirstChild("Data")
+                    local lvlObj = dataFolder and dataFolder:FindFirstChild("Level")
+                    local lvlPart = (Config.ESP_Level and lvlObj) and ("[Lv." .. tostring(lvlObj.Value) .. "] ") or ""
+                    table.insert(lines, string.format('<font color="#60A5FA">%s%s</font>', lvlPart, namePart))
+                end
+
+                if Config.ESP_Health or Config.ESP_Distance then
+                    local hpStr = Config.ESP_Health and string.format("HP: %d/%d", math.floor(hum.Health), math.floor(hum.MaxHealth)) or ""
+                    local distVal = myHrp and math.floor((myHrp.Position - hrp.Position).Magnitude) or 0
+                    local distStr = Config.ESP_Distance and string.format("[%dm]", distVal) or ""
+                    table.insert(lines, string.format('<font color="#4ADE80">%s %s</font>', hpStr, distStr))
+                end
+
+                if Config.ESP_Team or Config.ESP_Bounty then
+                    local teamStr = (Config.ESP_Team and plr.Team) and ("Team: " .. plr.Team.Name) or ""
+                    local leaderstats = plr:FindFirstChild("leaderstats")
+                    local bountyObj = leaderstats and leaderstats:FindFirstChild("Bounty/Honor")
+                    local bountyStr = (Config.ESP_Bounty and bountyObj) and ("Bounty: $" .. FormatCompactNumber(bountyObj.Value)) or ""
+                    table.insert(lines, string.format('<font color="#FACC15">%s %s</font>', teamStr, bountyStr))
+                end
+
+                if Config.ESP_KenActive or Config.ESP_PvpState then
+                    local kenStr = Config.ESP_KenActive and ("Ken: " .. (IsPlayerKenActive(plr) and "ON" or "OFF")) or ""
+                    local pvpStr = Config.ESP_PvpState and ("[" .. GetPlayerPvpState(plr) .. "]") or ""
+                    table.insert(lines, string.format('<font color="#F87171">%s %s</font>', kenStr, pvpStr))
+                end
+
+                local lbl = bGui:FindFirstChild("InfoLabel")
+                if lbl then
+                    lbl.Text = table.concat(lines, "\n")
+                end
+            elseif State.ESPObjects[plr.UserId] then
+                State.ESPObjects[plr.UserId].Enabled = false
+            end
+        end
+    end
+end
+
+Players.PlayerRemoving:Connect(function(plr)
+    if State.ESPObjects[plr.UserId] then
+        State.ESPObjects[plr.UserId]:Destroy()
+        State.ESPObjects[plr.UserId] = nil
+    end
+end)
+
+-- ========================================================================================
+-- [SECTION 11] FAST ATTACK AURA, SORU GC ENGINE & WEAPON COMBO SEQUENCER
+-- ========================================================================================
+-- Dispatches Melee, Sword, and Blox Fruit M1 fast attacks via Modules.Net
+local function ExecuteFastAttack(targetPlr)
+    if not IsPlayerAlive(LocalPlayer) or not IsPlayerAlive(targetPlr) then return end
+    local myChar = GetCharacter(LocalPlayer)
+    local tChar  = GetCharacter(targetPlr)
+    local tHead  = tChar and tChar:FindFirstChild("Head")
+    local tHrp   = GetRootPart(targetPlr)
+    local myHrp  = GetRootPart(LocalPlayer)
+    if not myChar or not tHead or not tHrp or not myHrp then return end
+
+    if (myHrp.Position - tHrp.Position).Magnitude > 68 then return end
+
+    local equippedTool = myChar:FindFirstChildOfClass("Tool")
+    if not equippedTool then return end
+
+    if equippedTool.ToolTip == "Blox Fruit" then
+        local leftClickRemote = equippedTool:FindFirstChild("LeftClickRemote")
+        if leftClickRemote then
+            local dir = (tHrp.Position - myHrp.Position).Unit
+            State.ComboCounter = (State.ComboCounter % 4) + 1
+            pcall(function()
+                leftClickRemote:FireServer(dir, State.ComboCounter, true)
+            end)
+            return
+        end
+    end
+
+    if not RegisterAttack or not RegisterHit then
+        ResolveCombatNet()
+    end
+
+    if RegisterAttack and RegisterHit then
+        pcall(function()
+            local otherBladeHits = {}
+            for _, otherPlr in ipairs(Players:GetPlayers()) do
+                if otherPlr ~= LocalPlayer and IsPlayerAlive(otherPlr) then
+                    local oChar = GetCharacter(otherPlr)
+                    local oHead = oChar and oChar:FindFirstChild("Head")
+                    local oHrp  = GetRootPart(otherPlr)
+                    if oChar and oHead and oHrp and (myHrp.Position - oHrp.Position).Magnitude <= 65 then
+                        table.insert(otherBladeHits, { oChar, oHead })
+                    end
+                end
+            end
+            if #otherBladeHits == 0 then
+                table.insert(otherBladeHits, { tChar, tHead })
+            end
+            RegisterAttack:FireServer(0)
+            RegisterHit:FireServer(tHead, otherBladeHits)
+        end)
+    elseif VirtualUser then
+        pcall(function()
+            VirtualUser:CaptureController()
+            VirtualUser:ClickButton1(Vector2.new(0, 0))
+        end)
+    end
+end
+
+-- Inspects garbage-collected closures to reset Soru & Geppo cooldown upvalues
+local function PatchSoruAndGeppoGC()
+    local char = GetCharacter(LocalPlayer)
+    if not char then return end
+    local soruScript = char:FindFirstChild("Soru")
+    local geppoScript = char:FindFirstChild("Geppo")
+
+    pcall(function()
+        for _, fn in pairs(getgc()) do
+            if type(fn) == "function" then
+                local envOk, env = pcall(getfenv, fn)
+                if envOk and env and (env.script == soruScript or env.script == geppoScript) then
+                    local upOk, ups = pcall(debug.getupvalues, fn)
+                    if upOk and ups then
+                        for _, upVal in pairs(ups) do
+                            if type(upVal) == "table" then
+                                if upVal.LastUse then upVal.LastUse = 0 end
+                                if upVal.Cooldown then upVal.Cooldown = 0 end
+                                if upVal.SkyJump then upVal.SkyJump = 0 end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end)
+end
+
+local function EquipWeaponByType(toolTipType)
+    local char = GetCharacter(LocalPlayer)
+    local backpack = LocalPlayer:FindFirstChild("Backpack")
+    local hum = GetHumanoid(LocalPlayer)
+    if not char or not backpack or not hum then return nil end
+
+    local current = char:FindFirstChildOfClass("Tool")
+    if current and current.ToolTip == toolTipType then
+        return current
+    end
+
+    for _, item in ipairs(backpack:GetChildren()) do
+        if item:IsA("Tool") and item.ToolTip == toolTipType then
+            hum:EquipTool(item)
+            return item
+        end
+    end
+    return nil
+end
+
+-- Cycles through enabled weapon categories and dispatches configured skill holds
+local function ExecuteSkillComboStep()
+    local rotationOrder = {}
+    if Config.UseMelee then table.insert(rotationOrder, "Melee") end
+    if Config.UseSword then table.insert(rotationOrder, "Sword") end
+    if Config.UseFruit then table.insert(rotationOrder, "Blox Fruit") end
+    if Config.UseGun   then table.insert(rotationOrder, "Gun") end
+    if #rotationOrder == 0 then return end
+
+    State.WeaponCycleIndex = (State.WeaponCycleIndex % #rotationOrder) + 1
+    local chosenType = rotationOrder[State.WeaponCycleIndex]
+    EquipWeaponByType(chosenType)
+
+    if chosenType == "Melee" then
+        if Config.Melee_Z then SendKeyPress(Enum.KeyCode.Z, Config.MeleeHoldZ) end
+        if Config.Melee_X then SendKeyPress(Enum.KeyCode.X, Config.MeleeHoldX) end
+        if Config.Melee_C then SendKeyPress(Enum.KeyCode.C, Config.MeleeHoldC) end
+    elseif chosenType == "Sword" then
+        if Config.Sword_Z then SendKeyPress(Enum.KeyCode.Z, Config.SwordHoldZ) end
+        if Config.Sword_X then SendKeyPress(Enum.KeyCode.X, Config.SwordHoldX) end
+    elseif chosenType == "Blox Fruit" then
+        if Config.Fruit_Z then SendKeyPress(Enum.KeyCode.Z, Config.FruitHoldZ) end
+        if Config.Fruit_X then SendKeyPress(Enum.KeyCode.X, Config.FruitHoldX) end
+        if Config.Fruit_C then SendKeyPress(Enum.KeyCode.C, Config.FruitHoldC) end
+        if Config.Fruit_V then SendKeyPress(Enum.KeyCode.V, Config.FruitHoldV) end
+    elseif chosenType == "Gun" then
+        if Config.Gun_Z then SendKeyPress(Enum.KeyCode.Z, Config.GunHoldZ) end
+        if Config.Gun_X then SendKeyPress(Enum.KeyCode.X, Config.GunHoldX) end
+    end
+end
+
+-- ========================================================================================
+-- [SECTION 12] 360° SILENT AIM METAMETHOD HOOK (__namecall MousePos)
+-- ========================================================================================
+-- Intercepts RemoteEvent:FireServer("MousePos", Vector3) for velocity-predicted aim[cite: 2]
+if hookmetamethod then
+    pcall(function()
+        local oldNamecall
+        oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+            local method = getnamecallmethod()
+            local args = { ... }
+
+            if not checkcaller() and Config.SilentAim and (method == "FireServer" or method == "InvokeServer") then
+                local target = State.LockedTarget or State.CurrentTarget
+                if target and IsPlayerAlive(target) then
+                    local tChar = GetCharacter(target)
+                    local aimPart = (tChar and tChar:FindFirstChild(Config.AimPart)) or GetRootPart(target)
+                    if aimPart and aimPart:IsA("BasePart") then
+                        local predictedPos = aimPart.Position + (aimPart.AssemblyLinearVelocity * Config.PredictionFactor)
+                        local remoteName = tostring(self.Name)
+
+                        if remoteName == "RemoteEvent" or remoteName == "CommE" then
+                            if args[1] == "MousePos" and typeof(args[2]) == "Vector3" then
+                                args[2] = predictedPos
+                                return oldNamecall(self, unpack(args))
+                            elseif typeof(args[1]) == "Vector3" then
+                                args[1] = predictedPos
+                                return oldNamecall(self, unpack(args))
+                            elseif typeof(args[1]) == "CFrame" then
+                                args[1] = CFrame.new(predictedPos)
+                                return oldNamecall(self, unpack(args))
+                            end
+                        end
+                    end
+                end
+            end
+
+            return oldNamecall(self, ...)
+        end))
+    end)
+end
+
+-- ========================================================================================
+-- [SECTION 13] MASTER RUNTIME LOOPS (RENDERSTEPPED, STEPPED, HEARTBEAT, INPUT)
+-- ========================================================================================
+-- 1. RenderStepped: FOV Circle Tracking, Target Acquisition, Visualizers & Camera Lock
+table.insert(State.Connections, RunService.RenderStepped:Connect(function()
+    FOVCircleFrame.Visible = Config.ShowFOV
+    if Config.ShowFOV then
+        local origin = GetFOVOrigin()
+        FOVCircleFrame.Position = UDim2.fromOffset(origin.X, origin.Y)
+        FOVCircleFrame.Size = UDim2.fromOffset(Config.FOVSize, Config.FOVSize)
+    end
+
+    State.CurrentTarget = GetBestTarget()
+    local activeTarget = State.LockedTarget or State.CurrentTarget
+
+    UpdateTargetVisualizers(activeTarget)
+
+    if Config.CameraLock and activeTarget and IsPlayerAlive(activeTarget) then
+        local tChar = GetCharacter(activeTarget)
+        local aimPart = (tChar and tChar:FindFirstChild(Config.AimPart)) or GetRootPart(activeTarget)
+        if aimPart and aimPart:IsA("BasePart") then
+            local predPos = aimPart.Position + (aimPart.AssemblyLinearVelocity * (Config.PredictionFactor * 0.5))
+            Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, predPos)
+        end
+    end
+end))
+
+-- 2. Stepped: Physics Modifiers, Anti Stun, Walk On Water, Safe Retreat & Target Teleport
+table.insert(State.Connections, RunService.Stepped:Connect(function(_, dt)
+    local char = GetCharacter(LocalPlayer)
+    local hum  = GetHumanoid(LocalPlayer)
+    local hrp  = GetRootPart(LocalPlayer)
+    if not char or not hum or not hrp or hum.Health <= 0 then return end
+
+    -- Anti Stun: Clears Stun/Busy values and restores PlatformStand
+    if Config.AntiStun then
+        local stunObj = char:FindFirstChild("Stun") or hum:FindFirstChild("Stun")
+        if stunObj and stunObj:IsA("ValueBase") and stunObj.Value ~= 0 then
+            stunObj.Value = 0
+        end
+        local busyObj = char:FindFirstChild("Busy")
+        if busyObj and busyObj:IsA("BoolValue") and busyObj.Value == true then
+            busyObj.Value = false
+        end
+        if hum.PlatformStand then
+            hum.PlatformStand = false
+        end
+    end
+
+    -- Speed Boost & Speed Multiply CFrame translation
+    if Config.SpeedBoost and hum.MoveDirection.Magnitude > 0 then
+        local mult = math.clamp(Config.SpeedMultiply, 1, 50)
+        local stepStuds = (mult * 0.085) * (dt * 60)
+        hrp.CFrame = hrp.CFrame + (hum.MoveDirection * stepStuds)
+    end
+
+    -- Jump Power override
+    if Config.JumpPower then
+        hum.UseJumpPower = true
+        hum.JumpPower = Config.JumpPowerValue
+    end
+
+    -- Walk On Water: Adjusts workspace.Map["WaterBase-Plane"].Size
+    if Config.WalkOnWater then
+        local map = Workspace:FindFirstChild("Map")
+        local waterPlane = map and map:FindFirstChild("WaterBase-Plane")
+        if waterPlane and waterPlane.Size.Y < 110 then
+            waterPlane.Size = Vector3.new(1000, 112, 1000)
+        end
+    end
+
+    -- Infinite Energy Lock
+    if Config.InfiniteEnergy then
+        local energyObj = char:FindFirstChild("Energy")
+        if energyObj and energyObj:IsA("ValueBase") then
+            energyObj.Value = energyObj.MaxValue or 15000
+        end
+    end
+
+    -- Auto Bounty Safe-Health Sky Retreat
+    if Config.AutoBounty then
+        if hum.Health <= Config.SafeHealth then
+            State.IsSafeZoneRetreating = true
+        elseif hum.Health >= math.min(Config.RecoverHealth, hum.MaxHealth * 0.85) then
+            State.IsSafeZoneRetreating = false
+        end
+
+        if State.IsSafeZoneRetreating then
+            hrp.CFrame = CFrame.new(hrp.Position.X, 4500, hrp.Position.Z)
+            hrp.AssemblyLinearVelocity = Vector3.zero
+            return
+        end
+    end
+
+    -- Teleport Behide Target / Auto Bounty Pursuit
+    local activeTarget = State.LockedTarget or State.CurrentTarget
+    if (Config.TeleportBehideTarget or Config.AutoBounty) and activeTarget and IsPlayerAlive(activeTarget) then
+        local tHrp = GetRootPart(activeTarget)
+        if tHrp then
+            local dist = (hrp.Position - tHrp.Position).Magnitude
+            if dist <= Config.TeleportBehideRange then
+                hrp.CFrame = tHrp.CFrame * CFrame.new(0, Config.TeleportOffsetY, Config.TeleportOffsetZ)
+                hrp.AssemblyLinearVelocity = Vector3.zero
+            elseif Config.AutoBounty then
+                TryPortalBypass(tHrp.Position)
+                local dir = (tHrp.Position - hrp.Position).Unit
+                hrp.CFrame = CFrame.new(hrp.Position + dir * math.min(dist, Config.TweenSpeed * dt), tHrp.Position)
+                hrp.AssemblyLinearVelocity = Vector3.zero
+            end
+        end
+    end
+end))
+
+-- 3. Heartbeat: Auto Haki, Race V3/V4, Fast Attack Aura, Auto Skills & ESP Updates
+table.insert(State.Connections, RunService.Heartbeat:Connect(function()
+    local now = os.clock()
+    local char = GetCharacter(LocalPlayer)
+    local activeTarget = State.LockedTarget or State.CurrentTarget
+
+    -- Auto Buso Haki ('HasBuso' check + CommF_:InvokeServer("Buso"))
+    if Config.BusoHaki and char and not char:FindFirstChild("HasBuso") and (now - State.LastBusoTick > 0.55) then
+        State.LastBusoTick = now
+        if CommF_ then
+            task.spawn(function()
+                pcall(function() CommF_:InvokeServer("Buso") end)
+            end)
+        end
+    end
+
+    -- Auto Ken (Observation) Haki (CommE:FireServer("Ken", true))
+    if Config.KenHaki and char and (now - State.LastKenTick > 2.5) then
+        State.LastKenTick = now
+        if CommE then
+            task.spawn(function()
+                pcall(function() CommE:FireServer("Ken", true) end)
+            end)
+        end
+    end
+
+    -- Auto Race V3 Ability (CommE:FireServer("ActivateAbility"))
+    if Config.RaceV3 and char and (now - State.LastRaceV3Tick > 1.0) then
+        State.LastRaceV3Tick = now
+        if CommE then
+            task.spawn(function()
+                pcall(function() CommE:FireServer("ActivateAbility") end)
+            end)
+        end
+    end
+
+    -- Auto Race V4 Awakening ('Awakening.RemoteFunction:InvokeServer(true)')
+    if Config.RaceV4 and char and (now - State.LastRaceV4Tick > 1.5) then
+        State.LastRaceV4Tick = now
+        local awakeningTool = char:FindFirstChild("Awakening") or (LocalPlayer:FindFirstChild("Backpack") and LocalPlayer.Backpack:FindFirstChild("Awakening"))
+        if awakeningTool and awakeningTool:FindFirstChild("RemoteFunction") then
+            task.spawn(function()
+                pcall(function() awakeningTool.RemoteFunction:InvokeServer(true) end)
+            end)
+        end
+    end
+
+    -- Soru & Geppo Cooldown GC Patch
+    if (Config.InfiniteGeppo or Config.SoruSilent) and (now - State.LastGCPatchTick > 1.2) then
+        State.LastGCPatchTick = now
+        PatchSoruAndGeppoGC()
+    end
+
+    -- Fast Attack Aura Execution
+    if (Config.AttackAura or Config.AutoBounty) and activeTarget and (now - State.LastAttackTick > Config.FastAttackDelay) then
+        State.LastAttackTick = now
+        ExecuteFastAttack(activeTarget)
+    end
+
+    -- Auto Skills / Auto Bounty Combo Sequencer
+    if (Config.AutoSkills or Config.AutoBounty) and activeTarget and IsPlayerAlive(activeTarget) and (now - State.LastSkillTick > 0.65) then
+        local myHrp = GetRootPart(LocalPlayer)
+        local tHrp  = GetRootPart(activeTarget)
+        if myHrp and tHrp and (myHrp.Position - tHrp.Position).Magnitude <= 55 then
+            State.LastSkillTick = now
+            ExecuteSkillComboStep()
+        end
+    end
+
+    -- Auto Bounty Hunt Timeout Cycle
+    if Config.AutoBounty and activeTarget then
+        if State.TargetHuntStartTick == 0 then
+            State.TargetHuntStartTick = now
+        elseif (now - State.TargetHuntStartTick) > Config.MaxHuntTime then
+            State.BlacklistedTargets[activeTarget.UserId] = true
+            State.LockedTarget = nil
+            State.CurrentTarget = nil
+            State.TargetHuntStartTick = now
+        end
+    end
+
+    UpdateESP()
+end))
+
+-- 4. Keyboard Input Handler (Toggle UI, Camera Lock, TP To Target, Skip Target, Soru Silent)[cite: 7]
+table.insert(State.Connections, UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+
+    if input.KeyCode == Config.Key_ToggleUI then
+        Config.UI_Visible = not Config.UI_Visible
+        MainWindow.Visible = Config.UI_Visible
+    elseif input.KeyCode == Config.Key_CameraLock then
+        Config.CameraLock = not Config.CameraLock
+        if Config.CameraLock then
+            State.LockedTarget = GetBestTarget()
+            CamLockStroke.Color = Theme.HudRedText
+            CamLockStroke.Transparency = 0
+        else
+            State.LockedTarget = nil
+            CamLockStroke.Color = Color3.fromRGB(50, 52, 60)
+            CamLockStroke.Transparency = 0.3
+        end
+    elseif input.KeyCode == Config.Key_TPToTarget then
+        local target = State.LockedTarget or State.CurrentTarget or GetBestTarget()
+        if target and IsPlayerAlive(target) then
+            local myHrp = GetRootPart(LocalPlayer)
+            local tHrp  = GetRootPart(target)
+            if myHrp and tHrp then
+                TryPortalBypass(tHrp.Position)
+                myHrp.CFrame = tHrp.CFrame * CFrame.new(0, Config.TeleportOffsetY, Config.TeleportOffsetZ)
+            end
+        end
+    elseif input.KeyCode == Config.Key_SkipTarget then
+        local cur = State.LockedTarget or State.CurrentTarget
+        if cur then
+            State.BlacklistedTargets[cur.UserId] = true
+            State.LockedTarget = nil
+            State.CurrentTarget = nil
+            Notify("Target Skipped", "Blacklisted " .. cur.Name, 2)
+        end
+    elseif input.KeyCode == Config.Key_SoruSilent and Config.SoruSilent then
+        local target = State.LockedTarget or State.CurrentTarget
+        if target and IsPlayerAlive(target) then
+            local myHrp = GetRootPart(LocalPlayer)
+            local tHrp  = GetRootPart(target)
+            if myHrp and tHrp and (myHrp.Position - tHrp.Position).Magnitude <= Config.SoruSilentRange then
+                myHrp.CFrame = tHrp.CFrame * CFrame.new(0, 0, 3.5)
+            end
+        end
+    end
+end))
+
+-- 5. Anti-AFK Idle Hook
+LocalPlayer.Idled:Connect(function()
+    if VirtualUser then
+        pcall(function()
+            VirtualUser:CaptureController()
+            VirtualUser:ClickButton2(Vector2.new(0, 0))
+        end)
+    end
+end)
+
+-- Initial Walk On Water Plane Application
+if Config.WalkOnWater then
+    pcall(function()
+        local map = Workspace:FindFirstChild("Map")
+        local waterPlane = map and map:FindFirstChild("WaterBase-Plane")
+        if waterPlane then
+            waterPlane.Size = Vector3.new(1000, 112, 1000)
+        end
+    end)
+end
+
+Notify("Hermanos'Dev | PVP", "v0.9 - FREE Loaded Successfully!", 3.5)
